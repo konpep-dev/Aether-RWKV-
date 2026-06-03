@@ -1,9 +1,9 @@
 """
 RWKV v4 — Correct implementation with time-mix WKV formula
 
-Changes from the previous version:
+Changes from previous version:
 1. Correct time-mix WKV with time_decay + time_first (bonus)
-2. state_num = w * state_num + exp(k) * v  (keeps only the past)
+2. state_num = w * state_num + exp(k) * v  (only keeps the past)
 3. wkv_t = (state_num + exp(u) * exp(k_t) * v_t) / (state_den + exp(u) * exp(k_t))
 4. ~25M params (hidden=544, layers=10)
 """
@@ -32,10 +32,10 @@ class RWKV_TimeMix(nn.Module):
         self.value = nn.Linear(hidden_size, hidden_size, bias=False)
         self.receptance = nn.Linear(hidden_size, hidden_size, bias=False)
         
-        # time_decay: how quickly the past is forgotten (per channel)
-        # initialized to log(1) ≈ 0, so exp(-exp(0)) ≈ 0.37
+        # time_decay: how fast the past is forgotten (per channel)
+        # initialized at log(1) ≈ 0, so exp(-exp(0)) ≈ 0.37
         self.time_decay = nn.Parameter(torch.empty(hidden_size))
-        # time_first: bonus on the current token (per channel)
+        # time_first: bonus for the current token (per channel)
         self.time_first = nn.Parameter(torch.empty(hidden_size))
         
         self.init_weights()
@@ -51,7 +51,7 @@ class RWKV_TimeMix(nn.Module):
         """
         Time-mix for training (parallel processing)
         
-        Computes the correct WKV:
+        Computes correct WKV:
         - state_num = w * state_num + exp(k) * v  (past only)
         - num = w * state_num + exp(u) * exp(k_t) * v_t  (past + current bonus)
         """
@@ -174,7 +174,7 @@ class RWKV(nn.Module):
     """
     Full RWKV v4 model
     
-    Embedding → 10× RWKV_Block → LayerNorm → Linear (output)
+    Embedding → 10× RWKV_Block → LayerNorm → Linear(output)
     ~25M params (hidden=544)
     """
     
@@ -200,7 +200,7 @@ class RWKV(nn.Module):
         
         self._block_outputs = None
         
-        # Init head specially: orthogonal gain = 0.5 * sqrt(vocab / hidden)
+        # Init head specifically: orthogonal gain = 0.5 * sqrt(vocab / hidden)
         head_gain = 0.5 * (vocab_size / hidden_size) ** 0.5
         nn.init.orthogonal_(self.head.weight, gain=head_gain)
         
@@ -260,6 +260,7 @@ class RWKV(nn.Module):
                     self._block_outputs = []
                 
                 logits, state = self.forward_step(x, state)
+                logits = logits[0, 0]  # squeeze from (1,1,vocab) -> (vocab)
                 
                 if progress_cb:
                     progress_cb(step + 1, max_new, list(self._block_outputs), generated)
