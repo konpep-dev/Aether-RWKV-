@@ -705,6 +705,77 @@ x = x + y                                       <span class="comment"># residual
   </div>
 </section>
 
+<!-- RECOMMENDED PARAMETERS -->
+<section>
+  <div class="section-label">Inference Guide</div>
+  <h2>Recommended Parameters</h2>
+  <p class="section-desc">Suggested sampling settings for different use cases. All flags are optional &mdash; defaults work well for general chat.</p>
+  <div class="code-block" style="margin-bottom: 20px;">
+    <span class="comment"># View all available flags</span><br>
+    <span class="cmd">$</span> python inference.py --help
+  </div>
+  <table class="specs">
+    <tr>
+      <td style="width:20%;">Flag</td>
+      <td style="width:20%;">Default</td>
+      <td style="width:20%;">Range</td>
+      <td style="width:40%;">When to adjust</td>
+    </tr>
+    <tr>
+      <td style="font-family:monospace;">--temp</td>
+      <td>0.5</td>
+      <td>0.1 &ndash; 1.0</td>
+      <td>Lower (0.2&ndash;0.3) for facts &amp; Q&amp;A, higher (0.7&ndash;1.0) for creative writing &amp; jokes</td>
+    </tr>
+    <tr>
+      <td style="font-family:monospace;">--topk</td>
+      <td>40</td>
+      <td>10 &ndash; 100</td>
+      <td>Lower (10&ndash;20) for precise answers, higher (50&ndash;80) for diverse output</td>
+    </tr>
+    <tr>
+      <td style="font-family:monospace;">--rep</td>
+      <td>1.3</td>
+      <td>1.0 &ndash; 1.5</td>
+      <td>Raise (1.4&ndash;1.5) if model repeats itself, lower (1.0&ndash;1.1) for less constrained replies</td>
+    </tr>
+    <tr>
+      <td style="font-family:monospace;">--maxtokens</td>
+      <td>80</td>
+      <td>20 &ndash; 200</td>
+      <td>Raise for long-form answers, lower for short single-sentence replies</td>
+    </tr>
+  </table>
+
+  <h2 style="font-size:18px;margin-top:36px;">Quick presets</h2>
+  <div class="grid-2">
+    <div class="card">
+      <h3>General chat</h3>
+      <div class="code-block" style="margin-top:10px;padding:14px 16px;font-size:12.5px;">
+        --temp 0.5 --topk 40 --rep 1.3 --maxtokens 80
+      </div>
+    </div>
+    <div class="card">
+      <h3>Factual / Q&amp;A</h3>
+      <div class="code-block" style="margin-top:10px;padding:14px 16px;font-size:12.5px;">
+        --temp 0.3 --topk 20 --rep 1.2 --maxtokens 60
+      </div>
+    </div>
+    <div class="card">
+      <h3>Creative / Story</h3>
+      <div class="code-block" style="margin-top:10px;padding:14px 16px;font-size:12.5px;">
+        --temp 0.8 --topk 60 --rep 1.4 --maxtokens 120
+      </div>
+    </div>
+    <div class="card">
+      <h3>One-word / Terse</h3>
+      <div class="code-block" style="margin-top:10px;padding:14px 16px;font-size:12.5px;">
+        --temp 0.2 --topk 10 --rep 1.1 --maxtokens 30
+      </div>
+    </div>
+  </div>
+</section>
+
 <!-- SCALING UP -->
 <section>
   <div class="section-label">Scaling Up</div>
