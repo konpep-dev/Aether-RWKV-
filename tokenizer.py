@@ -1,6 +1,6 @@
 """
-ΑΠΛΟΣ TOKENIZER — μετατρέπει κείμενο σε αριθμούς (token IDs) και το αντίστροφο
-Λειτουργεί σε επίπεδο λέξεων + σημείων στίξης
+SIMPLE TOKENIZER — converts text to numbers (token IDs) and back
+Operates at the level of words + punctuation marks
 """
 
 import re
@@ -9,36 +9,36 @@ from collections import Counter
 
 class Tokenizer:
     """
-    Tokenizer: μετατρέπει текст ↔ λίστα από ακέραιους αριθμούς (token IDs)
+    Tokenizer: converts text ↔ list of integers (token IDs)
     
-    Πώς λειτουργεί:
-    1. Παίρνει ένα κείμενο και το σπάει σε λέξεις (tokens)
-    2. Κάθε λέξη αντιστοιχεί σε ένα μοναδικό νούμερο (ID)
-    3. Χτίζει το λεξιλόγιο (vocabulary) από τα δεδομένα εκπαίδευσης
+    How it works:
+    1. Takes a text and splits it into words (tokens)
+    2. Each word corresponds to a unique number (ID)
+    3. Builds the vocabulary from the training data
     """
     
-    # Ειδικά tokens (λέξεις-κλειδιά για ειδικές λειτουργίες)
-    PAD = "<PAD>"   # token συμπλήρωσης (για ομοιόμορφο μήκος)
-    BOS = "<BOS>"   # αρχή πρότασης (beginning of sequence)
-    EOS = "<EOS>"   # τέλος πρότασης (end of sequence)  
-    UNK = "<UNK>"   # άγνωστη λέξη (unknown)
-    SEP = "<SEP>"   # διαχωριστής (separator)
+    # Special tokens (keywords for special functions)
+    PAD = "<PAD>"   # padding token (for uniform length)
+    BOS = "<BOS>"   # beginning of sequence
+    EOS = "<EOS>"   # end of sequence  
+    UNK = "<UNK>"   # unknown word
+    SEP = "<SEP>"   # separator
     SPECIAL = [PAD, BOS, EOS, UNK, SEP]
     
     def __init__(self, vocab=None, max_vocab=8192):
         """
-        Δημιουργεί tokenizer, είτε από υπάρχον vocab είτε από την αρχή
+        Creates a tokenizer, either from an existing vocab or from scratch
         
-        Παράμετροι:
-            vocab: υπάρχον λεξιλόγιο (dict λέξη→ID) ή None για νέο
-            max_vocab: μέγιστος αριθμός λέξεων στο λεξιλόγιο
+        Parameters:
+            vocab: existing vocabulary (dict word→ID) or None for a new one
+            max_vocab: maximum number of words in the vocabulary
         """
         self.max_vocab = max_vocab
         if vocab:
             self.vocab = vocab
             self.id_to_token = {v: k for k, v in vocab.items()}
         else:
-            # Ξεκινάμε με τα ειδικά tokens
+            # Start with the special tokens
             self.vocab = {}
             self.id_to_token = {}
             for i, token in enumerate(self.SPECIAL):
@@ -47,41 +47,41 @@ class Tokenizer:
     
     def _split(self, text):
         """
-        Σπάει ένα κείμενο σε tokens (λέξεις + σημεία στίξης)
+        Splits a text into tokens (words + punctuation marks)
         
-        Π.χ. "Hello, world!" → ["Hello", ",", "world", "!"]
+        E.g. "Hello, world!" → ["Hello", ",", "world", "!"]
         
-        Χρησιμοποιεί κανονική έκφραση για να ξεχωρίσει:
-        - Λέξεις (γράμματα)
-        - Αριθμούς
-        - Σημεία στίξης
+        Uses a regular expression to separate:
+        - Words (letters)
+        - Numbers
+        - Punctuation marks
         """
-        # Βρίσκει λέξεις (γράμματα), αριθμούς, σημεία στίξης (αγνοεί κενά)
+        # Finds words (letters), numbers, punctuation marks (ignores whitespace)
         return re.findall(r"[A-Za-z']+|[0-9]+|[.,!?;:()\[\]{}\"\-]+", text)
     
     def build_vocab(self, texts):
         """
-        Χτίζει το λεξιλόγιο από λίστα κειμένων
+        Builds the vocabulary from a list of texts
         
-        Βήματα:
-        1. Σπάει όλα τα κείμενα σε λέξεις
-        2. Μετράει συχνότητα κάθε λέξης
-        3. Κρατάει τις πιο συχνές λέξεις (μέχρι max_vocab)
-        4. Τις αντιστοιχίζει σε μοναδικά ID
+        Steps:
+        1. Splits all texts into words
+        2. Counts the frequency of each word
+        3. Keeps the most frequent words (up to max_vocab)
+        4. Maps them to unique IDs
         
-        Παράμετροι:
-            texts: λίστα από strings (τα δεδομένα εκπαίδευσης)
+        Parameters:
+            texts: list of strings (the training data)
         """
-        # Μετράμε όλες τις λέξεις σε όλα τα κείμενα
+        # Count all words across all texts
         counter = Counter()
         for text in texts:
             tokens = self._split(text)
             counter.update(tokens)
         
-        # Παίρνουμε τις πιο συχνές λέξεις
+        # Get the most frequent words
         most_common = counter.most_common(self.max_vocab - len(self.SPECIAL))
         
-        # Τις προσθέτουμε στο λεξιλόγιο
+        # Add them to the vocabulary
         for token, _ in most_common:
             if token not in self.vocab:
                 idx = len(self.vocab)
@@ -93,19 +93,19 @@ class Tokenizer:
     
     def encode(self, text, add_bos=True, add_eos=True):
         """
-        Μετατρέπει κείμενο σε λίστα από token IDs
+        Converts text to a list of token IDs
         
-        Βήματα:
-        1. Σπάει το κείμενο σε λέξεις
-        2. Κάθε λέξη → ID (αν υπάρχει) ή UNK αν είναι άγνωστη
-        3. Προσθέτει BOS/EOS αν χρειάζεται
+        Steps:
+        1. Splits the text into words
+        2. Each word → ID (if it exists) or UNK if unknown
+        3. Adds BOS/EOS if requested
         
-        Πα настоящ:
-            text: το κείμενο προς μετατροπή
-            add_bos: βάζει <BOS> στην αρχή;
-            add_eos: βάζει <EOS> στο τέλος;
+        Parameters:
+            text: the text to convert
+            add_bos: prepend <BOS>?
+            add_eos: append <EOS>?
         
-        Επιστρέφει: λίστα από ακέραιους IDs
+        Returns: list of integer IDs
         """
         tokens = self._split(text)
         ids = []
@@ -123,17 +123,17 @@ class Tokenizer:
     
     def decode(self, ids, skip_special=False):
         """
-        Μετατρέπει λίστα από token IDs σε κείμενο
+        Converts a list of token IDs to text
         
-        Βήματα:
-        1. Κάθε ID → λέξη
-        2. Ενώνει τις λέξεις σε κείμενο
+        Steps:
+        1. Each ID → word
+        2. Joins the words into text
         
-        Παράμετροι:
-            ids: λίστα από ακέραιους IDs
-            skip_special: αν True, αγνοεί ειδικά tokens (PAD, BOS, EOS)
+        Parameters:
+            ids: list of integer IDs
+            skip_special: if True, ignores special tokens (PAD, BOS, EOS)
         
-        Επιστρέφει: string
+        Returns: string
         """
         tokens = []
         for idx in ids:
@@ -142,14 +142,14 @@ class Tokenizer:
                 continue
             tokens.append(token)
         
-        # Ενώνει με κενό, αλλά προσέχει σημεία στίξης
+        # Join with spaces, but be careful with punctuation
         if not tokens:
             return ""
         
         text = tokens[0]
         for i in range(1, len(tokens)):
             cur = tokens[i]
-            # Σημεία στίξης που ΔΕΝ θέλουν κενό πριν
+            # Punctuation that should NOT have a space before it
             if cur in ".,!?;:)]}":
                 text += cur
             else:
@@ -157,23 +157,23 @@ class Tokenizer:
         return text
     
     def get_vocab_size(self):
-        """Επιστρέφει το μέγεθος του λεξιλογίου"""
+        """Returns the size of the vocabulary"""
         return len(self.vocab)
     
     def save(self, path):
-        """Αποθηκεύει το λεξιλόγιο σε αρχείο JSON"""
+        """Saves the vocabulary to a JSON file"""
         with open(path, "w", encoding="utf-8") as f:
             json.dump(self.vocab, f, ensure_ascii=False, indent=2)
     
     def load(self, path):
-        """Φορτώνει το λεξιλόγιο από αρχείο JSON"""
+        """Loads the vocabulary from a JSON file"""
         with open(path, "r", encoding="utf-8") as f:
             self.vocab = json.load(f)
         self.id_to_token = {v: k for k, v in self.vocab.items()}
 
 
 if __name__ == "__main__":
-    # Test: δημιουργούμε tokenizer και δοκιμάζουμε
+    # Test: create a tokenizer and try it out
     sample_texts = [
         "Hello, world! I am Aether.",
         "User: Who are you?\n\nAether: I am Aether.",

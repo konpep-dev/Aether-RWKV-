@@ -1038,7 +1038,7 @@ class AetherDataset:
     # 17. VARIED PHRASING EXPANSION
     # ================================================================ #
     def gen_varied(self):
-        # Ερώτηση -> [παραλλαγές ερώτησης] και αντίστοιχα answers
+        # Question -> [question variations] and corresponding answers
         topics = {
             "Who are you?": {
                 "qs": [
@@ -1323,7 +1323,7 @@ class AetherDataset:
             for g in greetings:
                 q_keys = list(qa_pool.keys())
                 random.shuffle(q_keys)
-                # Χρησιμοποιούμε 55 από τα 57 Q&A για ~20K σύνολο
+                # Use 55 out of 57 Q&A for a ~20K total
                 selected = q_keys[:55]
                 for q in selected:
                     a = pick(qa_pool[q])

@@ -12,7 +12,7 @@ from model import RWKV
 # ─── Live Neural Network Visualizer ──────────────────────────────────────── #
 
 class NeuralVisualizer:
-    """Ζωντανή απεικόνιση του νευρωνικού δικτύου κατά τη διάρκεια παραγωγής."""
+    """Live visualization of the neural network during generation."""
 
     def __init__(self, num_layers=10, width=56):
         self.num_layers = num_layers

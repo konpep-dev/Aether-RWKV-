@@ -1,9 +1,9 @@
 """
-RWKV v4 — Σωστή υλοποίηση με time-mix WKV formula
+RWKV v4 — Correct implementation with time-mix WKV formula
 
-Αλλαγές από προηγούμενη version:
-1. Σωστό time-mix WKV με time_decay + time_first (bonus)
-2. state_num = w * state_num + exp(k) * v  (κρατάει μόνο το παρελθόν)
+Changes from the previous version:
+1. Correct time-mix WKV with time_decay + time_first (bonus)
+2. state_num = w * state_num + exp(k) * v  (keeps only the past)
 3. wkv_t = (state_num + exp(u) * exp(k_t) * v_t) / (state_den + exp(u) * exp(k_t))
 4. ~25M params (hidden=544, layers=10)
 """
@@ -16,12 +16,12 @@ import math
 
 class RWKV_TimeMix(nn.Module):
     """
-    Time-Mix με σωστό WKV formula
+    Time-Mix with correct WKV formula
     
     wkv_t = (sum_{past} w * exp(k_i) * v_i + exp(u) * exp(k_t) * v_t) /
             (sum_{past} w * exp(k_i) + exp(u) * exp(k_t))
     
-    όπου w = exp(-exp(time_decay)), u = time_first
+    where w = exp(-exp(time_decay)), u = time_first
     """
     
     def __init__(self, hidden_size):
@@ -32,10 +32,10 @@ class RWKV_TimeMix(nn.Module):
         self.value = nn.Linear(hidden_size, hidden_size, bias=False)
         self.receptance = nn.Linear(hidden_size, hidden_size, bias=False)
         
-        # time_decay: πόσο γρήγορα ξεχνάει το παρελθόν (ανά κανάλι)
-        # initialized στο log(1) ≈ 0, οπότε exp(-exp(0)) ≈ 0.37
+        # time_decay: how quickly the past is forgotten (per channel)
+        # initialized to log(1) ≈ 0, so exp(-exp(0)) ≈ 0.37
         self.time_decay = nn.Parameter(torch.empty(hidden_size))
-        # time_first: bonus στο τρέχον token (ανά κανάλι)
+        # time_first: bonus on the current token (per channel)
         self.time_first = nn.Parameter(torch.empty(hidden_size))
         
         self.init_weights()
@@ -49,11 +49,11 @@ class RWKV_TimeMix(nn.Module):
     
     def forward(self, x, state=None):
         """
-        Time-mix για εκπαίδευση (παράλληλη επεξεργασία)
+        Time-mix for training (parallel processing)
         
-        Υπολογίζει σωστό WKV:
-        - state_num = w * state_num + exp(k) * v  (μόνο παρελθόν)
-        - num = w * state_num + exp(u) * exp(k_t) * v_t  (παρελθόν + bonus τρέχον)
+        Computes the correct WKV:
+        - state_num = w * state_num + exp(k) * v  (past only)
+        - num = w * state_num + exp(u) * exp(k_t) * v_t  (past + current bonus)
         """
         B, T, C = x.shape
         
@@ -115,9 +115,9 @@ class RWKV_TimeMix(nn.Module):
 
 class RWKV_ChannelMix(nn.Module):
     """
-    Channel-Mix: MLP με ReLU² + Sigmoid gate
+    Channel-Mix: MLP with ReLU² + Sigmoid gate
     
-    Δομή: Linear(×2) → ReLU² → Linear(÷2) × Sigmoid(receptance)
+    Structure: Linear(×2) → ReLU² → Linear(÷2) × Sigmoid(receptance)
     """
     
     def __init__(self, hidden_size):
@@ -172,9 +172,9 @@ class RWKV_Block(nn.Module):
 
 class RWKV(nn.Module):
     """
-    Πλήρες μοντέλο RWKV v4
+    Full RWKV v4 model
     
-    Embedding → 10× RWKV_Block → LayerNorm → Linear(έξοδος)
+    Embedding → 10× RWKV_Block → LayerNorm → Linear (output)
     ~25M params (hidden=544)
     """
     
@@ -186,7 +186,7 @@ class RWKV(nn.Module):
         self.num_layers = num_layers
         self.dropout = dropout
         
-        # Αλλάζουμε το ff_size αν χρειάζεται
+        # Change ff_size if needed
         RWKV_ChannelMix._ff_mult = ff_size_mult
         
         self.embed = nn.Embedding(vocab_size, hidden_size)
@@ -200,11 +200,11 @@ class RWKV(nn.Module):
         
         self._block_outputs = None
         
-        # Init head ειδικά: orthogonal gain = 0.5 * sqrt(vocab / hidden)
+        # Init head specially: orthogonal gain = 0.5 * sqrt(vocab / hidden)
         head_gain = 0.5 * (vocab_size / hidden_size) ** 0.5
         nn.init.orthogonal_(self.head.weight, gain=head_gain)
         
-        # Init υπόλοιπων layers (LayerNorm)
+        # Init remaining layers (LayerNorm)
         nn.init.ones_(self.ln_out.weight)
         nn.init.zeros_(self.ln_out.bias)
         

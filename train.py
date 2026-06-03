@@ -1,12 +1,12 @@
 """
-ΕΚΠΑΙΔΕΥΣΗ (TRAINING) — Μαθαίνουμε στο Aether να μιλάει
+TRAINING — Teaching Aether to speak
 
-Διαδικασία:
-1. Φορτώνουμε το dataset (aether_dataset.jsonl)
-2. Χτίζουμε tokenizer (λέξεις → αριθμούς)
-3. Δημιουργούμε το μοντέλο RWKV (~25M params)
-4. Εκπαιδεύουμε με backpropagation
-5. Αποθηκεύουμε το εκπαιδευμένο μοντέλο
+Process:
+1. Load the dataset (aether_dataset.jsonl)
+2. Build the tokenizer (words → numbers)
+3. Create the RWKV model (~25M params)
+4. Train with backpropagation
+5. Save the trained model
 """
 
 import json
@@ -195,29 +195,29 @@ class SystemMonitor:
             return False
 
 
-# ---------- 1. ΦΟΡΤΩΣΗ ΔΕΔΟΜΕΝΩΝ ----------
+# ---------- 1. DATA LOADING ----------
 
 class TextDataset(Dataset):
     """
-    Dataset: μετατρέπει τα δεδομένα μας σε μορφή που καταλαβαίνει το PyTorch
+    Dataset: converts our data into a format that PyTorch understands
     
-    Κάθε δείγμα είναι ένα κομμάτι κειμένου (π.χ. "User: Hello\n\nAether: Hi!")
-    Το μοντέλο μαθαίνει να προβλέπει την ΕΠΟΜΕΝΗ λέξη από τις προηγούμενες
+    Each sample is a piece of text (e.g. "User: Hello\n\nAether: Hi!")
+    The model learns to predict the NEXT word from the previous ones
     """
     
     def __init__(self, jsonl_path, tokenizer, max_length=64):
         """
-        Φορτώνει το dataset από αρχείο JSONL
+        Loads the dataset from a JSONL file
         
-        Παράμετροι:
-            jsonl_path: διαδρομή στο aether_dataset.jsonl
-            tokenizer: ο tokenizer για μετατροπή κειμένου σε IDs
-            max_length: μέγιστο μήκος ακολουθίας (κόβουμε μεγαλύτερες)
+        Parameters:
+            jsonl_path: path to aether_dataset.jsonl
+            tokenizer: the tokenizer for converting text to IDs
+            max_length: maximum sequence length (longer ones are truncated)
         """
         self.tokenizer = tokenizer
         self.max_length = max_length
         
-        # Διαβάζουμε όλες τις συνομιλίες από το JSONL
+        # Read all conversations from the JSONL
         self.samples = []
         with open(jsonl_path, "r", encoding="utf-8") as f:
             for line in f:
@@ -228,33 +228,33 @@ class TextDataset(Dataset):
         print(f"Loaded {len(self.samples)} conversations")
     
     def __len__(self):
-        """Πόσα δείγματα έχει το dataset"""
+        """How many samples the dataset has"""
         return len(self.samples)
     
     def __getitem__(self, idx):
         """
-        Παίρνει ένα δείγμα και το μετατρέπει σε:
-        - input_ids: οι λέξεις σαν αριθμοί (για είσοδο)
-        - target_ids: η επόμενη λέξη σε κάθε θέση (για έξοδο)
+        Takes a sample and converts it to:
+        - input_ids: the words as numbers (for input)
+        - target_ids: the next word at each position (for output)
         
-        Π.χ. αν το κείμενο είναι "Hello world"
+        E.g. if the text is "Hello world"
         input_ids:  [BOS, Hello, world, EOS]
         target_ids: [Hello, world, EOS, PAD]
         """
         text = self.samples[idx]
         
-        # Μετατροπή κειμένου σε IDs (με BOS/EOS)
+        # Convert text to IDs (with BOS/EOS)
         ids = self.tokenizer.encode(text, add_bos=True, add_eos=True)
         
-        # Κόβουμε αν είναι πολύ μεγάλο
+        # Truncate if too long
         if len(ids) > self.max_length:
             ids = ids[:self.max_length]
         
-        # Δημιουργούμε input (όλες εκτός τελευταίας) και target (όλες εκτός πρώτης)
-        input_ids = ids[:-1]  # Π.χ. [BOS, Hello, world]
-        target_ids = ids[1:]  # Π.χ. [Hello, world, EOS]
+        # Create input (all but last) and target (all but first)
+        input_ids = ids[:-1]  # E.g. [BOS, Hello, world]
+        target_ids = ids[1:]  # E.g. [Hello, world, EOS]
         
-        # Μετατροπή σε tensors (πίνακες PyTorch)
+        # Convert to tensors (PyTorch arrays)
         input_ids = torch.tensor(input_ids, dtype=torch.long)
         target_ids = torch.tensor(target_ids, dtype=torch.long)
         
@@ -263,24 +263,24 @@ class TextDataset(Dataset):
 
 def collate_batch(batch):
     """
-    Συνενώνει πολλά δείγματα σε ένα batch (ομάδα)
+    Combines many samples into a single batch
     
-    Επειδή κάθε δείγμα μπορεί να έχει διαφορετικό μήκος,
-    συμπληρώνουμε (padding) τα μικρότερα στο μήκος του μεγαλύτερου
+    Because each sample can have a different length,
+    we pad the shorter ones to the length of the longest
     """
     input_ids_list, target_ids_list = zip(*batch)
     
-    # Βρίσκουμε το μέγιστο μήκος
+    # Find the maximum length
     max_len = max(len(ids) for ids in input_ids_list)
     
     padded_inputs = []
     padded_targets = []
     
     for inp, tgt in zip(input_ids_list, target_ids_list):
-        # Πόσο padding χρειάζεται
+        # How much padding is needed
         pad_len = max_len - len(inp)
         
-        # Συμπληρώνουμε με PAD tokens (ID = 0)
+        # Pad with PAD tokens (ID = 0)
         padded_inp = torch.cat([inp, torch.zeros(pad_len, dtype=torch.long)])
         padded_tgt = torch.cat([tgt, torch.zeros(pad_len, dtype=torch.long)])
         
@@ -290,37 +290,37 @@ def collate_batch(batch):
     return torch.stack(padded_inputs), torch.stack(padded_targets)
 
 
-# ---------- 2. ΕΚΠΑΙΔΕΥΣΗ ----------
+# ---------- 2. TRAINING ----------
 
 def train_model(model, dataloader, epochs=10, lr=0.001, device='cpu',
                 checkpoint_dir="checkpoints", save_interval=1800,
                 tokenizer_vocab=None, hidden_size=544, num_layers=10, dropout=0.1,
                 resume_path=None):
     """
-    ΕΚΠΑΙΔΕΥΣΗ του μοντέλου
+    TRAINING the model
     
-    Αλγόριθμος:
-    1. Παίρνουμε ένα batch από δεδομένα
-    2. Το μοντέλο προβλέπει την επόμενη λέξη
-    3. Συγκρίνουμε πρόβλεψη με πραγματικότητα (loss)
-    4. Υπολογίζουμε gradients (backward)
-    5. Ενημερώνουμε βάρη (optimizer step)
-    6. Επαναλαμβάνουμε για όλα τα batches
-    7. Save checkpoint κάθε save_interval δευτερόλεπτα
+    Algorithm:
+    1. Take a batch of data
+    2. The model predicts the next word
+    3. Compare prediction with ground truth (loss)
+    4. Compute gradients (backward)
+    5. Update weights (optimizer step)
+    6. Repeat for all batches
+    7. Save a checkpoint every save_interval seconds
     
-    Παράμετροι:
-        model: το μοντέλο RWKV
-        dataloader: φορτωτής δεδομένων (δίνει batches)
-        epochs: πόσες φορές θα δει όλο το dataset
-        lr: ρυθμός εκμάθησης (learning rate)
-        device: 'cpu' ή 'cuda'
-        checkpoint_dir: φάκελος για τα checkpoints
-        save_interval: κάθε πόσα δευτερόλεπτα να γίνεται save (1800 = 30 λεπτά)
-        resume_path: αν υπάρχει, φορτώνει checkpoint και συνεχίζει
+    Parameters:
+        model: the RWKV model
+        dataloader: data loader (yields batches)
+        epochs: how many times to see the entire dataset
+        lr: learning rate
+        device: 'cpu' or 'cuda'
+        checkpoint_dir: folder for checkpoints
+        save_interval: how many seconds between saves (1800 = 30 minutes)
+        resume_path: if set, load a checkpoint and continue
     """
     model.to(device)
     
-    # Adam optimizer: weight decay MONO σε μεγάλα projections (όχι σε biases/LayerNorm/etc)
+    # Adam optimizer: weight decay ONLY on large projections (not on biases/LayerNorm/etc)
     decay_params = []
     no_decay_params = []
     for name, p in model.named_parameters():
@@ -333,11 +333,11 @@ def train_model(model, dataloader, epochs=10, lr=0.001, device='cpu',
         {'params': no_decay_params, 'weight_decay': 0.0}
     ], lr=lr)
     
-    # Loss function — μετράει πόσο απέχει η πρόβλεψη από την πραγματικότητα
-    # Cross-entropy: όσο πιο κοντά στο 0, τόσο καλύτερα
-    criterion = nn.CrossEntropyLoss(ignore_index=0)  # Αγνοούμε PAD tokens
+    # Loss function — measures how far the prediction is from the ground truth
+    # Cross-entropy: the closer to 0, the better
+    criterion = nn.CrossEntropyLoss(ignore_index=0)  # Ignore PAD tokens
     
-    # Δημιουργία φακέλου για checkpoints
+    # Create folder for checkpoints
     os.makedirs(checkpoint_dir, exist_ok=True)
     
     start_epoch = 0
@@ -349,7 +349,7 @@ def train_model(model, dataloader, epochs=10, lr=0.001, device='cpu',
         optimizer, T_max=total_batches, eta_min=1e-5
     )
     
-    # Αν υπάρχει resume_path, φορτώνουμε checkpoint
+    # If resume_path is set, load the checkpoint
     resume_loss = None
     if resume_path and os.path.exists(resume_path):
         print(f"\nLoading checkpoint: {resume_path}")
@@ -380,19 +380,19 @@ def train_model(model, dataloader, epochs=10, lr=0.001, device='cpu',
     monitor = SystemMonitor()
     print("-" * 50)
     
-    model.train()  # Λειτουργία εκπαίδευσης
+    model.train()  # Training mode
     
     last_save_time = time.time()
     best_loss = resume_loss if resume_loss is not None else float('inf')
     
-    # Χειρισμός Ctrl+C: αποθήκευση checkpoint πριν κλείσει
+    # Ctrl+C handling: save checkpoint before exit
     import signal
     save_on_exit = {'should_save': False}
     
     def handle_sigint(sig, frame):
         print("\n\nInterrupt received! Saving checkpoint before exit...")
         save_on_exit['should_save'] = True
-        # Αφήνουμε το τρέχον batch να τελειώσει
+        # Let the current batch finish
     
     signal.signal(signal.SIGINT, handle_sigint)
     
@@ -407,28 +407,28 @@ def train_model(model, dataloader, epochs=10, lr=0.001, device='cpu',
             if save_on_exit['should_save']:
                 break
             
-            # Resume: skip os batches που ήδη επεξεργαστήκαμε
+            # Resume: skip the batches we already processed
             if epoch == start_epoch and batch_idx < skip_batches:
                 continue
             
             input_ids = input_ids.to(device)
             target_ids = target_ids.to(device)
             
-            # Εμπρόσθια διάδοση: το μοντέλο προβλέπει
+            # Forward pass: the model predicts
             logits, _ = model(input_ids)
-            # logits: (batch, μήκος, vocab_size)
+            # logits: (batch, length, vocab_size)
             
-            # Υπολογισμός loss (σύγκριση πρόβλεψης με πραγματικότητα)
-            # Αλλάζουμε σχήμα για το CrossEntropyLoss
+            # Compute loss (compare prediction with ground truth)
+            # Reshape for CrossEntropyLoss
             B, T, V = logits.shape
             loss = criterion(logits.reshape(B * T, V), target_ids.reshape(B * T))
             
-            # Οπισθοδιάδοση: υπολογίζουμε gradients
-            optimizer.zero_grad()   # Μηδενίζουμε προηγούμενα gradients
-            loss.backward()         # Υπολογίζουμε νέα gradients
-            torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)  # Κόβουμε ακραίες τιμές
-            optimizer.step()        # Ενημερώνουμε βάρη
-            scheduler.step()        # Μειώνουμε LR σταδιακά (cosine decay)
+            # Backward pass: compute gradients
+            optimizer.zero_grad()   # Zero previous gradients
+            loss.backward()         # Compute new gradients
+            torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)  # Clip extreme values
+            optimizer.step()        # Update weights
+            scheduler.step()        # Gradually reduce LR (cosine decay)
             
             total_loss += loss.item()
             num_batches += 1
@@ -436,13 +436,13 @@ def train_model(model, dataloader, epochs=10, lr=0.001, device='cpu',
             # Live system monitor (CPU/RAM/temp) update
             monitor.update()
             
-            # Εμφάνιση προόδου κάθε 10 batches
+            # Show progress every 10 batches
             if (batch_idx + 1) % 10 == 0:
                 avg_loss = total_loss / num_batches
                 current_lr = scheduler.get_last_lr()[0]
                 print(f"Epoch {epoch+1}/{epochs} | Batch {batch_idx+1}/{len(dataloader)} | Loss: {avg_loss:.4f} | LR: {current_lr:.6f}")
             
-            # Save checkpoint κάθε save_interval δευτερόλεπτα
+            # Save checkpoint every save_interval seconds
             current_time = time.time()
             if current_time - last_save_time >= save_interval:
                 avg_loss = total_loss / max(num_batches, 1)
@@ -461,7 +461,7 @@ def train_model(model, dataloader, epochs=10, lr=0.001, device='cpu',
                     'tokenizer_vocab': tokenizer_vocab,
                 }, checkpoint_path)
                 
-                # Αν το loss είναι το καλύτερο, το κρατάμε και ως best
+                # If the loss is the best, also save it as best
                 if avg_loss < best_loss:
                     best_loss = avg_loss
                     best_path = os.path.join(checkpoint_dir, "checkpoint_best.pt")
@@ -484,7 +484,7 @@ def train_model(model, dataloader, epochs=10, lr=0.001, device='cpu',
         print(f"Epoch {epoch+1} completed | Average Loss: {avg_loss:.4f}")
         print("-" * 30)
     
-    # Save checkpoint on exit (από Ctrl+C ή κανονικό τέλος)
+    # Save checkpoint on exit (from Ctrl+C or normal end)
     if save_on_exit['should_save']:
         checkpoint_path = os.path.join(checkpoint_dir, "checkpoint_interrupted.pt")
         torch.save({
@@ -505,59 +505,59 @@ def train_model(model, dataloader, epochs=10, lr=0.001, device='cpu',
     return model
 
 
-# ---------- 3. MAIN — ΕΚΚΙΝΗΣΗ ΕΚΠΑΙΔΕΥΣΗΣ ----------
+# ---------- 3. MAIN — START TRAINING ----------
 
 def main():
-    # Ρυθμίσεις (μπορείς να τις αλλάξεις)
+    # Settings (you can change these)
     DATASET_PATH = "aether_dataset.jsonl"
     MODEL_SAVE_PATH = "aether_model.pt"
     TOKENIZER_SAVE_PATH = "aether_tokenizer.json"
     
-    BATCH_SIZE = 8        # Πόσα δείγματα ταυτόχρονα (8 βέλτιστο για CPU)
-    MAX_LENGTH = 64       # Μέγιστο μήκος κειμένου (λέξεις)
-    EPOCHS = 20           # Πόσες επαναλήψεις (~12-15 epochs σε 15 ώρες)
-    LEARNING_RATE = 0.001 # Αρχικός ρυθμός εκμάθησης (cosine decay → 1e-5)
+    BATCH_SIZE = 8        # How many samples at once (8 is optimal for CPU)
+    MAX_LENGTH = 64       # Maximum text length (words)
+    EPOCHS = 20           # How many passes (~12-15 epochs in 15 hours)
+    LEARNING_RATE = 0.001 # Initial learning rate (cosine decay → 1e-5)
     HIDDEN_SIZE = 480     # Deep & narrow: 12×480 ~24.7M (vs 10×544 ~26.6M)
-    NUM_LAYERS = 12       # Περισσότερα layers = καλύτερη γενίκευση
-    DROPOUT = 0.1         # Dropout για πρόληψη overfitting
+    NUM_LAYERS = 12       # More layers = better generalization
+    DROPOUT = 0.1         # Dropout to prevent overfitting
     
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
     print(f"Using device: {device}")
     
-    # --- Βήμα 1: Φόρτωση dataset και χτίσιμο tokenizer ---
+    # --- Step 1: Load dataset and build tokenizer ---
     print("\n=== Step 1: Building tokenizer ===")
     
-    # Διαβάζουμε όλα τα κείμενα για να χτίσουμε το λεξιλόγιο
+    # Read all texts to build the vocabulary
     texts = []
     with open(DATASET_PATH, "r", encoding="utf-8") as f:
         for line in f:
             data = json.loads(line)
             texts.append(data["text"])
     
-    # Δημιουργούμε tokenizer και χτίζουμε vocab
+    # Create the tokenizer and build the vocab
     tokenizer = Tokenizer()
     tokenizer.build_vocab(texts)
     vocab_size = tokenizer.get_vocab_size()
     print(f"Vocabulary size: {vocab_size}")
     
-    # Αποθηκεύουμε τον tokenizer για μελλοντική χρήση
+    # Save the tokenizer for future use
     tokenizer.save(TOKENIZER_SAVE_PATH)
     
-    # --- Βήμα 2: Δημιουργία Dataset και DataLoader ---
+    # --- Step 2: Create Dataset and DataLoader ---
     print("\n=== Step 2: Creating dataset ===")
     
     dataset = TextDataset(DATASET_PATH, tokenizer, max_length=MAX_LENGTH)
     dataloader = DataLoader(
         dataset, 
         batch_size=BATCH_SIZE, 
-        shuffle=True,      # Ανακάτεμα για καλύτερη εκμάθηση
+        shuffle=True,      # Shuffle for better learning
         collate_fn=collate_batch,
-        drop_last=True     # Αγνοούμε το τελευταίο ημιτελές batch
+        drop_last=True     # Ignore the last incomplete batch
     )
     
     print(f"Batches per epoch: {len(dataloader)}")
     
-    # --- Βήμα 3: Δημιουργία μοντέλου ---
+    # --- Step 3: Create the model ---
     print("\n=== Step 3: Creating model ===")
     
     model = RWKV(
@@ -567,14 +567,14 @@ def main():
         dropout=DROPOUT
     )
     
-    # Συνολικές παράμετροι
+    # Total parameters
     total = sum(p.numel() for p in model.parameters())
     print(f"Total parameters: {total:,}")
     
-    # --- Βήμα 4: Εκπαίδευση ---
+    # --- Step 4: Training ---
     print("\n=== Step 4: Training ===")
     
-    # Έλεγχος για checkpoint — resume ή fresh start
+    # Check for checkpoint — resume or fresh start
     resume_path = None
     ckpt_dir = "checkpoints"
     ckpt_candidates = [
@@ -617,7 +617,7 @@ def main():
         resume_path=resume_path,
     )
     
-    # --- Βήμα 5: Αποθήκευση ---
+    # --- Step 5: Saving ---
     print("\n=== Step 5: Saving model ===")
     
     torch.save({
@@ -630,7 +630,7 @@ def main():
     }, MODEL_SAVE_PATH)
     print(f"Model saved to {MODEL_SAVE_PATH}")
     
-    # --- Βήμα 6: Δοκιμή ---
+    # --- Step 6: Test ---
     print("\n=== Step 6: Quick test ===")
     
     test_prompt = "Hello"
