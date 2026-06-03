@@ -27,7 +27,7 @@ Each of the 12 blocks contains:
 - **WKV attention** — the O(T) "softmax-like" recurrence over a numerator/denominator state
 - **Receptance gate** — sigmoid yes/no on whether the new information flows through
 
-The full per-equation write-up lives on the [project page](https://USERNAME.github.io/aether/).
+The full per-equation write-up lives on the [project page](https://konpep-dev.github.io/Aether-RWKV-/).
 
 ```
 x'    = x · tm + x_prev · (1 - tm)              # token-shift
