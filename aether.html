@@ -1,0 +1,951 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Aether — Lightweight RWKV Language Model</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css" integrity="sha384-n8MVd4RsNIU0tAv4ct0nTaAbDJwPJzDEaqSD1odI+WdtXRGWt2kTvGFasHpSy3SV" crossorigin="anonymous">
+<style>
+:root {
+  --bg: #070b14;
+  --surface: #0f1724;
+  --border: #1a2640;
+  --text: #e8edf5;
+  --text-dim: #8899b4;
+  --accent: #5b8def;
+  --accent2: #8b7cf7;
+  --green: #3bc48a;
+  --grad: linear-gradient(135deg, var(--accent), var(--accent2));
+}
+* { margin:0; padding:0; box-sizing:border-box; }
+html { scroll-behavior:smooth; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', system-ui, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  line-height: 1.7;
+  overflow-x: hidden;
+}
+::selection { background:var(--accent); color:#000; }
+
+.container { max-width:1040px; margin:0 auto; padding:0 32px; }
+
+/* ---- HERO ---- */
+.hero {
+  min-height: 80vh;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: flex-start;
+  padding: 80px 0;
+  text-align: left;
+}
+.hero h1 {
+  font-size: clamp(48px, 8vw, 88px);
+  font-weight: 900;
+  letter-spacing: -2.5px;
+  line-height: 1.05;
+  margin-bottom: 12px;
+}
+.hero h1 .grad {
+  background: var(--grad);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+.hero .tagline {
+  font-size: 16px;
+  color: var(--text-dim);
+  margin-bottom: 40px;
+  font-weight: 400;
+  letter-spacing: 0.2px;
+}
+.hero-stats {
+  display: flex;
+  gap: 48px;
+  flex-wrap: wrap;
+}
+.hero-stat { }
+.hero-stat .num {
+  font-size: 28px;
+  font-weight: 800;
+  color: var(--accent);
+  letter-spacing: -0.5px;
+}
+.hero-stat .label {
+  font-size: 11px;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 1.4px;
+  font-weight: 600;
+  margin-top: 2px;
+}
+
+/* ---- LOGO ---- */
+.logo {
+  width: 120px;
+  height: 120px;
+  position: relative;
+}
+.logo svg {
+  width: 100%;
+  height: 100%;
+}
+.logo-letter {
+  fill: url(#lg);
+}
+
+/* ---- SECTIONS ---- */
+section { padding: 80px 0; }
+section + section { border-top: 1px solid var(--border); }
+.section-label {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  color: var(--accent);
+  margin-bottom: 8px;
+}
+h2 {
+  font-size: 28px;
+  font-weight: 700;
+  margin-bottom: 12px;
+}
+.section-desc {
+  font-size: 15px;
+  color: var(--text-dim);
+  max-width: 600px;
+  margin-bottom: 32px;
+}
+
+/* about */
+.about-text {
+  font-size: 15px;
+  color: var(--text-dim);
+  max-width: 720px;
+  line-height: 1.8;
+}
+.about-text strong { color: var(--text); }
+
+/* specs */
+.specs { width:100%; border-collapse:collapse; font-size:14px; }
+.specs tr { border-bottom:1px solid var(--border); }
+.specs td { padding:14px 0; }
+.specs td:first-child { color:var(--text-dim); width:34%; font-weight:500; }
+.specs td:last-child { font-family:'SF Mono','Fira Code',monospace; color:var(--text); }
+.specs .tag {
+  display:inline-block; padding:2px 10px; border-radius:6px;
+  font-size:11px; font-weight:600; margin-left:6px;
+}
+.tag-blue { background:rgba(91,141,239,0.12); color:var(--accent); }
+.tag-green { background:rgba(59,196,138,0.12); color:var(--green); }
+
+/* cards */
+.grid-2 { display:grid; grid-template-columns:repeat(auto-fit,minmax(300px,1fr)); gap:24px; }
+.card {
+  background:var(--surface); border:1px solid var(--border);
+  border-radius:14px; padding:28px; transition:border-color .25s;
+}
+.card:hover { border-color:rgba(91,141,239,0.25); }
+.card h3 { font-size:15px; margin-bottom:10px; }
+.card p, .card li { font-size:13.5px; color:var(--text-dim); line-height:1.7; }
+.card ul { list-style:none; padding:0; }
+.card li { padding:3px 0; }
+.card li::before { content:"/"; color:var(--accent); margin-right:8px; font-weight:700; font-family:monospace; }
+
+/* math tabs */
+.math-tabs { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:20px; }
+.math-tab {
+  padding:8px 16px; background:var(--surface); border:1px solid var(--border);
+  border-radius:8px; color:var(--text-dim); font-size:13px; font-weight:600;
+  cursor:pointer; transition:all .2s; font-family:inherit;
+}
+.math-tab:hover { border-color:rgba(91,141,239,0.4); color:var(--text); }
+.math-tab.active {
+  background:rgba(91,141,239,0.12); border-color:var(--accent);
+  color:var(--accent);
+}
+.math-panel {
+  background:var(--surface); border:1px solid var(--border);
+  border-radius:14px; padding:32px;
+}
+.math-panel h3 { font-size:15px; margin-bottom:8px; color:var(--text); }
+.math-panel p { font-size:13.5px; color:var(--text-dim); margin-bottom:16px; line-height:1.7; }
+.math-eq {
+  background:#0a0f18; border:1px solid var(--border);
+  border-radius:8px; padding:22px 24px; color:var(--text);
+  overflow-x:auto; text-align:center;
+}
+.math-eq .katex { font-size:1.15em; color:var(--text); }
+.math-eq .katex .mord, .math-eq .katex .mrel, .math-eq .katex .mbin,
+.math-eq .katex .mopen, .math-eq .katex .mclose, .math-eq .katex .mpunct {
+  color:var(--text);
+}
+.math-eq .katex .mop { color:var(--accent); }
+.math-panel { display:none; }
+.math-panel.active { display:block; }
+
+/* dataset preview */
+.dataset-controls {
+  display:flex; gap:12px; align-items:center; margin-bottom:20px;
+  flex-wrap:wrap;
+}
+.dataset-search {
+  flex:1; min-width:240px; padding:10px 16px; background:var(--surface);
+  border:1px solid var(--border); border-radius:10px;
+  color:var(--text); font-size:14px; font-family:inherit;
+  outline:none; transition:border-color .2s;
+}
+.dataset-search:focus { border-color:var(--accent); }
+.dataset-search::placeholder { color:var(--text-dim); }
+.dataset-stats {
+  font-size:12px; color:var(--text-dim); font-family:'SF Mono',monospace;
+  padding:8px 14px; background:var(--surface); border:1px solid var(--border);
+  border-radius:8px;
+}
+.dataset-stats b { color:var(--accent); font-weight:700; }
+
+.dataset-views { display:flex; gap:4px; margin-left:8px; }
+.dataset-view-btn {
+  padding:8px 14px; background:var(--surface);
+  border:1px solid var(--border); border-radius:8px;
+  color:var(--text-dim); font-size:12px; font-weight:600;
+  cursor:pointer; transition:all .2s; font-family:inherit;
+}
+.dataset-view-btn:hover { color:var(--text); }
+.dataset-view-btn.active {
+  background:rgba(91,141,239,0.12); border-color:var(--accent);
+  color:var(--accent);
+}
+
+.dataset-list { display:flex; flex-direction:column; gap:16px; }
+
+/* chat view */
+.chat-conv {
+  background:var(--surface); border:1px solid var(--border);
+  border-radius:12px; padding:18px 20px;
+  transition:border-color .2s;
+}
+.chat-conv:hover { border-color:rgba(91,141,239,0.3); }
+.chat-conv-idx {
+  font-size:10.5px; color:var(--text-dim); font-family:'SF Mono',monospace;
+  margin-bottom:10px; letter-spacing:0.5px;
+}
+.chat-bubble {
+  padding:10px 14px; border-radius:12px; font-size:13.5px;
+  line-height:1.6; margin:6px 0; max-width:80%;
+  white-space:pre-wrap; word-wrap:break-word;
+}
+.chat-bubble.user {
+  background:rgba(91,141,239,0.15); color:var(--text);
+  border:1px solid rgba(91,141,239,0.2);
+  margin-left:auto; text-align:left;
+}
+.chat-bubble.aether {
+  background:rgba(167,139,250,0.10); color:var(--text);
+  border:1px solid rgba(167,139,250,0.2);
+  margin-right:auto; text-align:left;
+}
+.chat-bubble .label {
+  display:block; font-size:10px; font-weight:700;
+  letter-spacing:1px; margin-bottom:4px;
+  text-transform:uppercase; opacity:0.7;
+}
+.chat-bubble.user .label { color:var(--accent); }
+.chat-bubble.aether .label { color:var(--accent2); }
+
+/* raw view */
+.raw-conv {
+  background:#0a0f18; border:1px solid var(--border);
+  border-radius:10px; padding:14px 18px; overflow-x:auto;
+  transition:border-color .2s;
+}
+.raw-conv:hover { border-color:rgba(91,141,239,0.3); }
+.raw-conv-idx {
+  font-size:10.5px; color:var(--text-dim); font-family:'SF Mono',monospace;
+  margin-bottom:8px; letter-spacing:0.5px;
+}
+.raw-conv pre {
+  margin:0; font-family:'SF Mono','Fira Code',monospace;
+  font-size:12.5px; line-height:1.7; color:var(--text);
+  white-space:pre-wrap; word-wrap:break-word;
+}
+.raw-conv .raw-key { color:var(--accent); }
+.raw-conv .raw-str { color:#3bc48a; }
+
+mark { background:rgba(91,141,239,0.3); color:var(--text); padding:0 2px; border-radius:2px; }
+
+.dataset-actions { text-align:center; margin-top:24px; }
+.dataset-btn {
+  padding:10px 24px; background:var(--surface);
+  border:1px solid var(--border); border-radius:8px;
+  color:var(--text); font-size:13px; font-weight:600;
+  cursor:pointer; transition:all .2s; font-family:inherit;
+}
+.dataset-btn:hover { border-color:var(--accent); color:var(--accent); }
+.dataset-empty { text-align:center; color:var(--text-dim); padding:40px 0; font-size:14px; }
+.dataset-loading { text-align:center; color:var(--text-dim); padding:40px 0; font-size:13px; }
+
+/* usage */
+.code-block {
+  background:#0a0f18; border:1px solid var(--border);
+  border-radius:12px; padding:24px; overflow-x:auto;
+  font-family:'SF Mono','Fira Code',monospace;
+  font-size:13px; line-height:1.8; color:var(--text-dim);
+}
+.code-block .cmd { color:var(--green); }
+.code-block .comment { color:#3d4a5c; font-style:italic; }
+
+.about-text code, .code-block code {
+  font-family:'SF Mono','Fira Code',monospace;
+  font-size:0.92em;
+  padding:1px 6px; border-radius:4px;
+  background:rgba(91,141,239,0.1); color:var(--accent);
+}
+
+/* footer */
+footer {
+  text-align:center; padding:48px 0 56px;
+  color:var(--text-dim); font-size:13px;
+  border-top:1px solid var(--border); margin-top:24px;
+}
+footer a { color:var(--accent); text-decoration:none; }
+footer a:hover { text-decoration:underline; }
+.footer-meta { font-size:11.5px; opacity:0.45; margin-top:6px; }
+
+/* responsive */
+@media (max-width:720px) {
+  .container { padding:0 20px; }
+  section { padding:56px 0; }
+  h2 { font-size:24px; }
+  .hero { min-height:auto; padding:60px 0 40px; }
+  .hero-stats { gap:28px; }
+}
+</style>
+</head>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js" integrity="sha384-XjKyOOlGwcjNTAIQHIpgOno0Hl1YQqzUOEleOLALmuqehneUG+vnGctmUb0ZY0l8" crossorigin="anonymous"></script>
+<body>
+
+<div class="container">
+
+<!-- HERO -->
+<section class="hero">
+  <h1><span class="grad">Aether</span></h1>
+  <p class="tagline">Lightweight language model &mdash; RWKV architecture &mdash; CPU-first</p>
+  <div class="hero-stats">
+    <div class="hero-stat"><div class="num">24.7M</div><div class="label">Parameters</div></div>
+    <div class="hero-stat"><div class="num">12</div><div class="label">Layers</div></div>
+    <div class="hero-stat"><div class="num">480</div><div class="label">Hidden Dim</div></div>
+    <div class="hero-stat"><div class="num">22K</div><div class="label">Conversations</div></div>
+    <div class="hero-stat"><div class="num">~580K</div><div class="label">Tokens</div></div>
+  </div>
+</section>
+
+<!-- ABOUT -->
+<section>
+  <div class="section-label">About</div>
+  <h2>What is Aether?</h2>
+  <div class="about-text">
+    <p>Aether is a conversational language model built on the <strong>RWKV v4</strong> architecture 
+    (Receptance Weighted Key Value). Unlike traditional Transformers, RWKV uses a linear attention 
+    mechanism that enables efficient CPU inference with no quadratic memory costs.</p>
+    <br>
+    <p>Trained on a custom dataset of ~22,000 conversations spanning computer science, casual chat, 
+    creative writing, advice, and more. Designed to run on modest hardware — a 4-core Intel i5-4570 
+    with 16 GB RAM is sufficient for both training and inference.</p>
+  </div>
+</section>
+
+<!-- RWKV DEEP DIVE -->
+<section>
+  <div class="section-label">Architecture Deep Dive</div>
+  <h2>What is RWKV?</h2>
+  <p class="section-desc">
+    <strong>RWKV</strong> is a custom RNN architecture that manages to train in parallel 
+    like a Transformer while running in constant space like a classic RNN. The name comes 
+    from its four core parameters: <strong>R</strong>eceptance, <strong>W</strong> (time-decay 
+    weight), <strong>K</strong>ey, and <strong>V</strong>alue.
+  </p>
+
+  <div class="grid-2">
+    <div class="card">
+      <h3>Two modes, one model</h3>
+      <p>At training time RWKV is parallelized just like a Transformer. At inference time it 
+      is a pure RNN. The same weights, two different compute patterns. This is something 
+      Transformers and traditional RNNs both struggle to do.</p>
+    </div>
+    <div class="card">
+      <h3>O(T) instead of O(T&sup2;)</h3>
+      <p>Self-attention looks at every previous token, so its cost grows quadratically with 
+      sequence length. RWKV only ever updates a fixed-size state vector, so the cost is 
+      linear — and constant in memory.</p>
+    </div>
+    <div class="card">
+      <h3>Each channel has its own memory</h3>
+      <p>Inside the state, every channel "forgets" at its own learned rate. Some channels 
+      track what's coming next in the sentence; others hold the topic of the paragraph. 
+      The model decides which is which.</p>
+    </div>
+    <div class="card">
+      <h3>Built for tiny hardware</h3>
+      <p>Most of RWKV's inference is matrix-vector multiplies — embarrassingly fast on 
+      any modern CPU. Aether takes this further by also being trainable on modest hardware 
+      in a few hours.</p>
+    </div>
+  </div>
+
+  <h2 style="margin-top: 56px;">A simplified forward pass</h2>
+  <p class="section-desc">What actually happens inside a single RWKV block, in 8 lines.</p>
+
+  <div class="code-block" style="margin-bottom: 24px;">
+<span class="comment"># Simplified Aether forward pass — one RWKV block</span><br>
+xx = shift(x)                                  <span class="comment"># previous token's hidden state</span><br>
+xk = blend(x, xx, time_mix_k)                  <span class="comment"># mix current+prev into a key</span><br>
+xv = blend(x, xx, time_mix_v)                  <span class="comment"># ...and into a value</span><br>
+xr = blend(x, xx, time_mix_r)                  <span class="comment"># ...and into a receptance</span><br>
+k, v, r = key(xk), value(xv), receptance(xr)   <span class="comment"># learnable projections</span><br>
+wkv = wkv_update(k, v, decay, bonus)           <span class="comment"># the O(T) attention step</span><br>
+y = output(sigmoid(r) * wkv)                   <span class="comment"># gate by receptance, project out</span><br>
+x = x + y                                       <span class="comment"># residual connection</span>
+  </div>
+
+  <p class="about-text" style="margin-top: 24px;">
+    The single most important idea behind RWKV: the time-decay parameter does not depend 
+    on the input. That one design choice is what lets the layer train in parallel (you can 
+    precompute all the decay multipliers ahead of time) while still being a real RNN at 
+    inference — the entire history is collapsed into a fixed-size state vector.
+  </p>
+
+  <h2 style="font-size:22px;margin-top:48px;">The math, step by step</h2>
+  <p class="section-desc">Plain-language intuition for each equation, in the order they fire during one forward pass.</p>
+
+  <div class="math-tabs">
+    <button class="math-tab active" data-tab="1">1. Time-decay</button>
+    <button class="math-tab" data-tab="2">2. Bonus weight</button>
+    <button class="math-tab" data-tab="3">3. Token-shift</button>
+    <button class="math-tab" data-tab="4">4. WKV update</button>
+    <button class="math-tab" data-tab="5">5. State recurrence</button>
+    <button class="math-tab" data-tab="6">6. Output gate</button>
+  </div>
+
+  <div class="math-panel active" data-panel="1">
+    <h3>1. Time-decay — each channel "forgets" at its own rate</h3>
+    <p>
+      Think of the hidden state as a row of buckets, one per channel. Every step, each 
+      bucket slowly leaks away. The decay rate is learned per-channel: a "tense-verb" channel 
+      might decay fast (you only need the past few tokens), while a "topic" channel decays 
+      slowly (it should stick around for the whole paragraph). The double exponential 
+      is a trick to keep the value strictly in <code>(0, 1)</code> no 
+      matter what the optimizer tries to set it to.
+    </p>
+    <div class="math-eq" data-formula="w = \exp\!\big(-\exp(\text{time\_decay})\big)"></div>
+  </div>
+
+  <div class="math-panel" data-panel="2">
+    <h3>2. Bonus weight — "this token is special"</h3>
+    <p>
+      The decay rule above treats the current token the same as any other. But in language, 
+      the most recent word usually matters most. So we add a small bonus weight that 
+      is applied to the current token's contribution only. It's learned too — a tiny 
+      asymmetric boost that costs almost nothing.
+    </p>
+    <div class="math-eq" data-formula="u = \exp(\text{time\_first})"></div>
+  </div>
+
+  <div class="math-panel" data-panel="3">
+    <h3>3. Token-shift — bleed a little of the past in</h3>
+    <p>
+      Before we use the current token, we blend it with the previous token's hidden 
+      state. The mixing coefficient is learned per channel. Fast-mixing channels pick 
+      up context from one step back; slow-mixing ones stay close to the current token. 
+      It's the same trick Apple's AFT (Attention-Free Transformer) popularized — 
+      and it works really well.
+    </p>
+    <div class="math-eq" data-formula="x' \;=\; x \cdot \text{tm} \;+\; x_{\text{prev}} \cdot (1 - \text{tm})"></div>
+  </div>
+
+  <div class="math-panel" data-panel="4">
+    <h3>4. WKV — the heart of the layer</h3>
+    <p>
+      The output is a ratio. The <em>numerator</em> holds "weighted values from all 
+      previous tokens, plus this one". The <em>denominator</em> holds the same thing 
+      without the values, acting as a softmax normalizer. The <code>u</code> bonus is 
+      added <em>only to the current token</em> — past tokens keep their regular weights.
+    </p>
+    <div class="math-eq" data-formula="\text{wkv}_t \;=\; \frac{e^{\,u + k_t}\cdot v_t \;+\; \text{num}_{t-1}}{e^{\,u + k_t} \;+\; \text{den}_{t-1}}"></div>
+  </div>
+
+  <div class="math-panel" data-panel="5">
+    <h3>5. State recurrence — two vectors, not one</h3>
+    <p>
+      The "state" is actually <strong>two fixed-size vectors</strong>: a numerator and 
+      a denominator. They are updated in parallel by two near-identical recurrences. 
+      Both decay with <code>w</code>, and both accumulate the current token's key — 
+      but only the numerator absorbs the value. After a million tokens, you still 
+      only need to carry these two vectors forward — no KV cache, no attention matrix.
+    </p>
+    <div class="math-eq" data-formula="\begin{aligned} \text{num}_t &= w \cdot \text{num}_{t-1} + e^{k_t}\cdot v_t \\ \text{den}_t &= w \cdot \text{den}_{t-1} + e^{k_t} \end{aligned}"></div>
+  </div>
+
+  <div class="math-panel" data-panel="6">
+    <h3>6. Output gate — "should I update or not?"</h3>
+    <p>
+      Just like in a Transformer where the attention output gets multiplied by V, in 
+      RWKV the WKV result gets multiplied by a sigmoid of the <em>receptance</em>. 
+      R is the model's "yes/no" — for each channel, it decides whether the new info 
+      should actually flow through, or whether the channel wants to ignore this token.
+    </p>
+    <div class="math-eq" data-formula="y_t \;=\; \sigma(r_t)\cdot \text{wkv}_t"></div>
+  </div>
+</section>
+
+<!-- RWKV vs TRANSFORMER -->
+<section>
+  <div class="section-label">Comparison</div>
+  <h2>RWKV vs Transformer</h2>
+  <p class="section-desc">Why pick RWKV for a CPU-friendly LLM?</p>
+  <table class="specs">
+    <tr><td>Cost per token (training)</td><td>RWKV <span class="tag tag-green">O(T)</span> &nbsp; vs &nbsp; Transformer <span class="tag tag-blue">O(T&sup2;)</span></td></tr>
+    <tr><td>Memory at inference</td><td>RWKV <span class="tag tag-green">O(1) fixed state</span> &nbsp; vs &nbsp; Transformer <span class="tag tag-blue">O(T) growing cache</span></td></tr>
+    <tr><td>Effective context</td><td>RWKV <span class="tag tag-green">unbounded in theory</span> &nbsp; vs &nbsp; Transformer <span class="tag tag-blue">windowed by memory</span></td></tr>
+    <tr><td>Mechanism</td><td>RWKV <span class="tag tag-green">linear state update</span> &nbsp; vs &nbsp; Transformer <span class="tag tag-blue">softmax Q&middot;K</span></td></tr>
+    <tr><td>Sentence embedding</td><td>RWKV <span class="tag tag-green">the state itself</span> &nbsp; vs &nbsp; Transformer <span class="tag tag-blue">pool the outputs</span></td></tr>
+    <tr><td>Token/sec on Aether's CPU</td><td>RWKV <span class="tag tag-green">~145 tok/s</span> &nbsp; vs &nbsp; Transformer <span class="tag tag-blue">not viable</span></td></tr>
+  </table>
+  <p class="about-text" style="margin-top: 20px; font-size: 13px;">
+    Numbers measured on Aether's 4-core i5-4570 at 3.2 GHz. Real-world speed depends on context length, 
+    temperature, and what counts as "viable" for your use case.
+  </p>
+</section>
+
+<!-- SPECS -->
+<section>
+  <div class="section-label">Architecture</div>
+  <h2>Technical Specifications</h2>
+  <p class="section-desc">Deep &amp; narrow configuration for optimal quality-per-parameter.</p>
+  <table class="specs">
+    <tr><td>Architecture</td><td>RWKV v4 (time-mix + channel-mix)</td></tr>
+    <tr><td>Parameters</td><td>24,684,032</td></tr>
+    <tr><td>Layers</td><td>12</td></tr>
+    <tr><td>Hidden Size</td><td>480</td></tr>
+    <tr><td>Vocabulary</td><td>~5,400 tokens<span class="tag tag-green">BPE-free</span></td></tr>
+    <tr><td>Context Length</td><td>64 tokens</td></tr>
+    <tr><td>Init Scheme</td><td>Orthogonal with per-layer gains<span class="tag tag-blue">RWKV standard</span></td></tr>
+    <tr><td>Dropout</td><td>0.1 (embedding + every block)</td></tr>
+    <tr><td>Weight Decay</td><td>0.1 on projections, 0.0 on biases/LN<span class="tag tag-green">selective</span></td></tr>
+  </table>
+</section>
+
+<!-- DATASET PREVIEW -->
+<section>
+  <div class="section-label">Training Data</div>
+  <h2>The dataset, live</h2>
+  <p class="section-desc">
+    Browse the actual conversations Aether learned from. Switch between chat-bubble 
+    and raw JSON views. Search by keyword to filter any of the 22,010 entries.
+  </p>
+  <div class="dataset-controls">
+    <input type="text" class="dataset-search" id="ds-search" 
+           placeholder="Search (e.g. 'firewall', 'joke', 'python')...">
+    <div class="dataset-views">
+      <button class="dataset-view-btn active" data-view="chat">Chat</button>
+      <button class="dataset-view-btn" data-view="raw">Raw</button>
+    </div>
+    <div class="dataset-stats">
+      <b id="ds-shown">0</b> shown of <b id="ds-total">0</b>
+    </div>
+  </div>
+  <div class="dataset-list" id="ds-list">
+    <div class="dataset-loading">Loading dataset...</div>
+  </div>
+  <div class="dataset-actions">
+    <button class="dataset-btn" id="ds-more">Load more</button>
+  </div>
+</section>
+
+<!-- TRAINING -->
+<section>
+  <div class="section-label">Training</div>
+  <h2>How it was trained</h2>
+  <p class="section-desc">Trained on CPU over ~15 hours with carefully curated data.</p>
+  <div class="grid-2">
+    <div class="card">
+      <h3>Dataset</h3>
+      <p>22,010 conversations across 14 thematic sections:</p>
+      <ul>
+        <li>CS knowledge (hardware, networking, OS, algorithms, security, AI)</li>
+        <li>Casual chat &amp; small talk (hobbies, opinions, life advice)</li>
+        <li>Creative writing &amp; storytelling</li>
+        <li>Multi-turn conversations with follow-ups</li>
+        <li>Combinatorial templates for broad coverage</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h3>Hyperparameters</h3>
+      <ul>
+        <li>Batch size: 8 <span style="color:var(--text-dim);font-size:12px;">(optimal for CPU)</span></li>
+        <li>Learning rate: 0.001 &rarr; 1e-5 <span style="color:var(--text-dim);font-size:12px;">(cosine annealing)</span></li>
+        <li>Optimizer: AdamW <span style="color:var(--text-dim);font-size:12px;">(selective weight decay)</span></li>
+        <li>Gradient clipping: 1.0</li>
+        <li>Epochs: 12-15 <span style="color:var(--text-dim);font-size:12px;">(~15h budget)</span></li>
+        <li>Checkpoint every 30 min <span style="color:var(--text-dim);font-size:12px;">(auto-resume)</span></li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- USE CASES -->
+<section>
+  <div class="section-label">Use Cases</div>
+  <h2>Where Aether fits in</h2>
+  <p class="section-desc">Not a 7B model — a 25M specialist. Here's where it makes sense.</p>
+  <div class="grid-2">
+    <div class="card">
+      <h3>Edge &amp; embedded devices</h3>
+      <p>Raspberry Pi, mobile phones, IoT boards. RWKV's constant-space inference means Aether 
+      can run on hardware where Transformers simply won't fit. A single state vector, not a growing KV cache.</p>
+    </div>
+    <div class="card">
+      <h3>Privacy-first local assistants</h3>
+      <p>Run a chatbot entirely offline. No API calls, no data leaving the device. Useful for 
+      personal journaling, drafting, brainstorming, or any task where conversations 
+      should stay private.</p>
+    </div>
+    <div class="card">
+      <h3>Learning &amp; research</h3>
+      <p>Small enough to train end-to-end in hours on consumer hardware, big enough to demonstrate 
+      real learning. Great playground for experimenting with initialization, schedulers, datasets, 
+      and architectural variants.</p>
+    </div>
+    <div class="card">
+      <h3>Domain-specific fine-tuning</h3>
+      <p>24.7M params is a perfect base for domain adaptation. Fine-tune on a few thousand 
+      examples of medical, legal, or company-specific text and get a specialized expert model 
+      in minutes.</p>
+    </div>
+    <div class="card">
+      <h3>High-throughput batch jobs</h3>
+      <p>When you need to process millions of documents (classification, extraction, summarization)
+      the per-token cost matters. CPU + RWKV beats GPU + Transformer for low-latency 
+      single-token workloads.</p>
+    </div>
+    <div class="card">
+      <h3>Autocomplete &amp; inline assistance</h3>
+      <p>Sub-100ms generation on modest hardware. Drop it into an editor, IDE, or search box
+      to power lightweight completions without a network round-trip.</p>
+    </div>
+  </div>
+</section>
+
+<!-- FEATURES -->
+<section>
+  <div class="section-label">Features</div>
+  <h2>What makes Aether different</h2>
+  <p class="section-desc">Designed for real-world use on everyday hardware.</p>
+  <div class="grid-2">
+    <div class="card">
+      <h3>100% CPU Inference</h3>
+      <p>No GPU required. Runs comfortably on any modern processor — from laptops to servers.</p>
+    </div>
+    <div class="card">
+      <h3>Live Neural Visualization</h3>
+      <p>Watch the network think in real time. Synaptic pulses animate through all 12 layers during generation.</p>
+    </div>
+    <div class="card">
+      <h3>Resumable Training</h3>
+      <p>Interrupted mid-training? Automatic checkpointing saves model, optimizer, and scheduler state for seamless resume.</p>
+    </div>
+    <div class="card">
+      <h3>Real-time System Monitor</h3>
+      <p>Live CPU, RAM, and temperature bars displayed at the bottom-right of the terminal during training.</p>
+    </div>
+  </div>
+</section>
+
+<!-- USAGE -->
+<section>
+  <div class="section-label">Usage</div>
+  <h2>Running Aether</h2>
+  <p class="section-desc">Generate text with a single command.</p>
+  <div class="code-block">
+    <span class="comment"># Basic chat</span><br>
+    <span class="cmd">$</span> python inference.py --quick "Tell me about neural networks"<br><br>
+    <span class="comment"># With live neural visualization</span><br>
+    <span class="cmd">$</span> python inference.py --vis "What is AI?"<br><br>
+    <span class="comment"># Disable visualization</span><br>
+    <span class="cmd">$</span> python inference.py --novis --quick "Hello"<br><br>
+    <span class="comment"># Resume training from checkpoint</span><br>
+    <span class="cmd">$</span> python train.py &nbsp; <span class="comment"># prompts to resume or start fresh</span>
+  </div>
+</section>
+
+<!-- SCALING UP -->
+<section>
+  <div class="section-label">Scaling Up</div>
+  <h2>How to make Aether bigger</h2>
+  <p class="section-desc">
+    Aether is intentionally small (24.7M) so it trains on a 4-core i5 in hours. 
+    The same code scales to much larger models — here is exactly what to change.
+  </p>
+
+  <h2 style="font-size:18px;margin-top:32px;">1. Architecture config in <code style="color:var(--accent);background:rgba(91,141,239,0.1);padding:1px 6px;border-radius:4px;font-size:0.9em;">train.py</code></h2>
+  <div class="code-block">
+<span class="comment"># === Aether (current) — 24.7M params, CPU-friendly ===</span><br>
+HIDDEN_SIZE = 480            <span class="comment"># 12 layers deep, narrow</span><br>
+NUM_LAYERS = 12<br>
+MAX_LENGTH = 64               <span class="comment"># context window</span><br>
+DROPOUT = 0.1<br>
+BATCH_SIZE = 8                <span class="comment"># optimal for CPU</span><br>
+EPOCHS = 20<br>
+LEARNING_RATE = 0.001<br>
+<br>
+<span class="comment"># === Aether-Medium — ~100M params, still CPU-trainable in ~3-5 days ===</span><br>
+HIDDEN_SIZE = 768<br>
+NUM_LAYERS = 16               <span class="comment"># deeper + wider</span><br>
+MAX_LENGTH = 128              <span class="comment"># 2x context</span><br>
+DROPOUT = 0.05                <span class="comment"># less dropout for bigger model</span><br>
+BATCH_SIZE = 4                <span class="comment"># smaller batch (more memory per sample)</span><br>
+LEARNING_RATE = 0.0005        <span class="comment"># lower LR for bigger model</span><br>
+<br>
+<span class="comment"># === Aether-Large — ~350M params, needs GPU ===</span><br>
+HIDDEN_SIZE = 1024<br>
+NUM_LAYERS = 24<br>
+MAX_LENGTH = 512              <span class="comment"># long context</span><br>
+DROPOUT = 0.1<br>
+BATCH_SIZE = 32<br>
+LEARNING_RATE = 0.0003        <span class="comment"># standard for ~350M</span><br>
+  </div>
+
+  <h2 style="font-size:18px;margin-top:32px;">2. Dataset scaling in <code style="color:var(--accent);background:rgba(91,141,239,0.1);padding:1px 6px;border-radius:4px;font-size:0.9em;">generate_dataset.py</code></h2>
+  <p class="about-text" style="font-size:14px;">
+    Bigger models need proportionally more diverse data. Each existing section has a multiplier 
+    pattern. To scale data 5x:
+  </p>
+  <div class="code-block">
+<span class="comment"># Multiply every section's output</span><br>
+def generate(self):<br>
+&nbsp;&nbsp;&nbsp;&nbsp;for _ in range(5):                <span class="comment"># &lt;-- repeat loop</span><br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;self.gen_identity()<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;self.gen_greetings()<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;self.gen_knowledge()<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;self.gen_cs_hardware()<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="comment"># ... all other sections ...</span><br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;self.gen_casual_multi()<br>
+<br>
+<span class="comment"># Or append a real-world text dataset:</span><br>
+<span class="comment"># pip install datasets</span><br>
+<span class="comment"># from datasets import load_dataset</span><br>
+<span class="comment"># wiki = load_dataset("wikipedia", "20220301.en", split="train[:50000]")</span><br>
+<span class="comment"># for doc in wiki:</span><br>
+<span class="comment">#     self.add(doc["title"], doc["text"])</span><br>
+  </div>
+
+  <h2 style="font-size:18px;margin-top:32px;">3. Scaling rules of thumb</h2>
+  <div class="grid-2">
+    <div class="card">
+      <h3>Data &asymp; 20x params</h3>
+      <p>For 100M params aim for ~2B tokens. The current 580K tokens is enough for 24.7M, 
+      but a 100M model will quickly overfit on it.</p>
+    </div>
+    <div class="card">
+      <h3>Lower LR for bigger models</h3>
+      <p>Halve the learning rate when you double the width. The 0.001 used for 24.7M is 
+      too aggressive for 100M+. Stick to AdamW with selective weight decay.</p>
+    </div>
+    <div class="card">
+      <h3>Dropout shrinks as data grows</h3>
+      <p>With 580K tokens we needed dropout=0.1. With 50M+ tokens, dropout=0.05 or even 0.0 
+      works better. Over-regularization limits capacity.</p>
+    </div>
+    <div class="card">
+      <h3>Context length trade-off</h3>
+      <p>Longer MAX_LENGTH improves coherence but quadratically increases memory. For CPU, 
+      stick to 64-128. For GPU, try 512-1024.</p>
+    </div>
+    <div class="card">
+      <h3>Use the official RWKV recipe</h3>
+      <p>For 100M+ models, follow <a href="https://github.com/BlinkDL/RWKV-LM" style="color:var(--accent);">BlinkDL's RWKV-LM</a> 
+      init gains and lr-per-parameter. The values we use match their small-model config.</p>
+    </div>
+    <div class="card">
+      <h3>Watch your checkpoint size</h3>
+      <p>A 350M model is ~1.4GB. Make sure your disk has room for several checkpoints 
+      and your RAM is &ge; 32GB for CPU training at that scale.</p>
+    </div>
+  </div>
+</section>
+
+<!-- FOOTER -->
+<footer>
+  Built by <a href="#">Konpep</a> &middot; RWKV by <a href="https://github.com/BlinkDL/RWKV-LM" target="_blank">BlinkDL</a>
+  <div class="footer-meta">Aether &mdash; Lightweight RWKV Language Model &mdash; 2026</div>
+</footer>
+
+</div>
+
+<script>
+// math tabs
+(function(){
+  const tabs = document.querySelectorAll('.math-tab');
+  const panels = document.querySelectorAll('.math-panel');
+  tabs.forEach(tab => {
+    tab.addEventListener('click', () => {
+      const id = tab.dataset.tab;
+      tabs.forEach(t => t.classList.toggle('active', t === tab));
+      panels.forEach(p => p.classList.toggle('active', p.dataset.panel === id));
+    });
+  });
+})();
+
+// dataset preview
+(function(){
+  const BATCH = 25;
+  let allRaw = [];
+  let filtered = [];
+  let shown = 0;
+  let searchTerm = '';
+  let viewMode = 'chat';
+
+  const list = document.getElementById('ds-list');
+  const search = document.getElementById('ds-search');
+  const moreBtn = document.getElementById('ds-more');
+  const shownEl = document.getElementById('ds-shown');
+  const totalEl = document.getElementById('ds-total');
+  const viewBtns = document.querySelectorAll('.dataset-view-btn');
+
+  function parseConvo(text){
+    const parts = text.split(/\n\n(?=User: |Aether: )/);
+    const turns = [];
+    for (const p of parts){
+      const m = p.match(/^(User|Aether):\s*([\s\S]*)$/);
+      if (m) turns.push({role:m[1].toLowerCase(), text:m[2].trim()});
+    }
+    return turns;
+  }
+
+  function escapeHtml(s){
+    return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+
+  function highlight(s){
+    if (!searchTerm) return escapeHtml(s);
+    const safe = escapeHtml(s);
+    const re = new RegExp('('+searchTerm.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+')','gi');
+    return safe.replace(re,'<mark>$1</mark>');
+  }
+
+  function formatJson(obj){
+    let s = JSON.stringify(obj, null, 2);
+    s = escapeHtml(s);
+    s = s.replace(/"([^"\\]*(?:\\.[^"\\]*)*)"(\s*:)/g, '<span class="raw-key">"$1"</span>$2');
+    s = s.replace(/:\s*"([^"\\]*(?:\\.[^"\\]*)*)"/g, ': <span class="raw-str">"$1"</span>');
+    return s;
+  }
+
+  function renderChat(entries, startIdx){
+    return entries.map((c, i) => {
+      const idx = startIdx + i + 1;
+      const turnsHtml = c.convo.map(t =>
+        '<div class="chat-bubble '+t.role+'">'+
+          '<span class="label">'+t.role+'</span>'+
+          highlight(t.text)+
+        '</div>'
+      ).join('');
+      return '<div class="chat-conv" data-idx="'+idx+'">'+
+        '<div class="chat-conv-idx">#'+String(idx).padStart(5,'0')+'</div>'+
+        turnsHtml+
+      '</div>';
+    }).join('');
+  }
+
+  function renderRaw(entries, startIdx){
+    return entries.map((c, i) => {
+      const idx = startIdx + i + 1;
+      const jsonStr = formatJson(c.parsed);
+      const highlighted = searchTerm ? highlight(jsonStr) : jsonStr;
+      return '<div class="raw-conv" data-idx="'+idx+'">'+
+        '<div class="raw-conv-idx">#'+String(idx).padStart(5,'0')+'</div>'+
+        '<pre>'+highlighted+'</pre>'+
+      '</div>';
+    }).join('');
+  }
+
+  function renderBatch(){
+    const slice = filtered.slice(shown, shown + BATCH);
+    if (slice.length === 0){
+      if (shown === 0) list.innerHTML = '<div class="dataset-empty">No conversations match "'+escapeHtml(searchTerm)+'"</div>';
+      moreBtn.style.display = 'none';
+      return;
+    }
+    const html = viewMode === 'chat'
+      ? renderChat(slice, shown)
+      : renderRaw(slice, shown);
+    if (shown === 0) list.innerHTML = html;
+    else list.insertAdjacentHTML('beforeend', html);
+    shown += slice.length;
+    shownEl.textContent = shown;
+    totalEl.textContent = filtered.length;
+    moreBtn.style.display = (shown >= filtered.length) ? 'none' : 'inline-block';
+  }
+
+  function applyFilter(){
+    const term = searchTerm.toLowerCase();
+    filtered = term
+      ? allRaw.filter(c => c.line.toLowerCase().includes(term))
+      : allRaw;
+    shown = 0;
+    list.innerHTML = '';
+    renderBatch();
+  }
+
+  function switchView(mode){
+    viewMode = mode;
+    viewBtns.forEach(b => b.classList.toggle('active', b.dataset.view === mode));
+    shown = 0;
+    list.innerHTML = '';
+    renderBatch();
+  }
+
+  search.addEventListener('input', e => {
+    searchTerm = e.target.value.trim();
+    applyFilter();
+  });
+  moreBtn.addEventListener('click', renderBatch);
+  viewBtns.forEach(b => b.addEventListener('click', () => switchView(b.dataset.view)));
+
+  fetch('aether_dataset.jsonl')
+    .then(r => r.ok ? r.text() : Promise.reject('HTTP '+r.status))
+    .then(text => {
+      allRaw = text.split('\n').filter(l => l.trim()).map(l => {
+        try {
+          const parsed = JSON.parse(l);
+          return { line: l, parsed, convo: parseConvo(parsed.text) };
+        } catch { return null; }
+      }).filter(c => c && c.convo.length);
+      applyFilter();
+    })
+    .catch(err => {
+      list.innerHTML = '<div class="dataset-empty">Could not load dataset ('+err+').<br>Make sure <code>aether_dataset.jsonl</code> is in the same folder.<br>Use a local server: <code>python -m http.server</code></div>';
+      moreBtn.style.display = 'none';
+    });
+})();
+
+function renderMath() {
+  if (typeof katex === 'undefined') { setTimeout(renderMath, 50); return; }
+  document.querySelectorAll('.math-eq[data-formula]').forEach(el => {
+    try {
+      katex.render(el.getAttribute('data-formula'), el, {displayMode: true, throwOnError: false});
+    } catch (e) {
+      el.textContent = '[math error]';
+    }
+  });
+}
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', renderMath);
+} else {
+  renderMath();
+}
+</script>
+
+</body>
+</html>
