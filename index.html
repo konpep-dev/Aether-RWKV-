@@ -380,6 +380,13 @@ footer a:hover { text-decoration:underline; }
   <div class="section-label">Try it</div>
   <h2>Chat with Aether</h2>
   <p class="section-desc">No download needed. Runs on Hugging Face free CPU hardware — be patient, inference is slow.</p>
+  <div style="background:rgba(91,141,239,0.08);border:1px solid var(--border);border-radius:12px;padding:16px 20px;margin-bottom:16px;font-size:14px;color:var(--text-dim);display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+    <span style="font-size:18px;">&#9888;</span>
+    <span style="flex:1;">This model has only <strong>25 million parameters</strong> — it is a tiny experiment, not a serious assistant. Responses will often be nonsense. But small experiments grow into big things.</span>
+    <a href="#scale-up" style="display:inline-flex;align-items:center;gap:6px;padding:8px 16px;border-radius:8px;background:linear-gradient(135deg,#5b8def,#8b7cf7);color:#fff;text-decoration:none;font-size:13px;font-weight:500;white-space:nowrap;">
+      How to scale up &rarr;
+    </a>
+  </div>
   <div style="border-radius:12px;overflow:hidden;border:1px solid var(--border);background:var(--surface);">
     <iframe src="https://konpep-aether-rwkv-25m.hf.space" frameborder="0" width="100%" height="600" style="display:block;"></iframe>
   </div>
@@ -798,7 +805,7 @@ x = x + y                                       <span class="comment"># residual
 </section>
 
 <!-- SCALING UP -->
-<section>
+<section id="scale-up">
   <div class="section-label">Scaling Up</div>
   <h2>How to make Aether bigger</h2>
   <p class="section-desc">
