@@ -4,7 +4,7 @@
 
 A small, self-contained language model using the **RWKV v4** architecture — a linear-time attention design with no KV cache and no GPU requirement. Trained on a custom dataset of 22,000 computer science and casual conversations (English + Greek).
 
-The trained weights are not included in this repository. See [Training your own](#training-your-own).
+
 
 ---
 
