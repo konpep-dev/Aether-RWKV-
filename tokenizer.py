@@ -57,7 +57,7 @@ class Tokenizer:
         - Punctuation marks
         """
         # Finds words (letters), numbers, punctuation marks (ignores whitespace)
-        return re.findall(r"[A-Za-z']+|[0-9]+|[.,!?;:()\[\]{}\"\-]+", text)
+        return re.findall(r"[A-Za-z']+|[0-9]+|[.,!?;:()\[\]{}\"\-<>]+", text)
     
     def build_vocab(self, texts):
         """
@@ -149,11 +149,15 @@ class Tokenizer:
         text = tokens[0]
         for i in range(1, len(tokens)):
             cur = tokens[i]
-            # Punctuation that should NOT have a space before it
-            if cur in ".,!?;:)]}":
+            # No space before punctuation or angle brackets
+            if cur in ".,!?;:)]}<>":
                 text += cur
             else:
                 text += " " + cur
+        # Clean up spacing around < > for emotion tags
+        import re
+        text = re.sub(r'<\s+', '<', text)
+        text = re.sub(r'\s+>', '>', text)
         return text
     
     def get_vocab_size(self):

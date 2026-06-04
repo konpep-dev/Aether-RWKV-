@@ -267,15 +267,33 @@ def chat(model, tokenizer, max_tokens=100, temperature=0.7, top_k=30,
         if _is_hallucinated(response):
             response = "I'm still learning. Ask me something else!"
 
+        emoji, clean = _format_with_emoji(response)
+        display = f"{emoji} {clean}".strip() if emoji else clean
         if not viz:
-            print(response)
+            print(display)
         else:
-            print(f"Aether: {response}")
+            print(f"Aether: {display}")
 
         history.append(f"Aether: {response}")
 
         if len(history) > 20:
             history = history[-20:]
+
+
+def _format_with_emoji(text):
+    import re
+    m = re.match(r'<(\w+)>\s*(.*)', text.strip())
+    if not m:
+        return '', text
+    tag = m.group(1)
+    rest = m.group(2)
+    emojis = {
+        "joy": "[joy]", "sadness": "[sad]", "anger": "[anger]", "fear": "[fear]",
+        "surprise": "[wow]", "confusion": "[hmm]", "neutral": "",
+        "sarcasm": "[sarcasm]", "encouragement": "[keep going]", "curiosity": "[?]",
+    }
+    prefix = emojis.get(tag, "")
+    return prefix, rest
 
 
 # ─── Quick test ──────────────────────────────────────────────────────────── #
@@ -374,9 +392,11 @@ def test_generation(model, tokenizer, prompt="User: Hello\n\nAether:",
     if _is_hallucinated(generated_text):
         generated_text = "I'm still learning. Ask me something else!"
 
+    emoji, clean = _format_with_emoji(generated_text)
+    display = f"{emoji} {clean}".strip() if emoji else clean
     if not visual:
         print(f"\nYou: {prompt.replace('User: ','').replace('\n\nAether:','')}")
-    print(f"Aether: {generated_text}")
+    print(f"Aether: {display}")
 
     return generated_text
 
@@ -385,12 +405,12 @@ def test_generation(model, tokenizer, prompt="User: Hello\n\nAether:",
 
 def main():
     parser = argparse.ArgumentParser(description="Aether - Chat with your AI")
-    parser.add_argument("--temp", type=float, default=0.5, help="Temperature (0=σταθερό, 1=τυχαίο)")
+    parser.add_argument("--temp", type=float, default=0.5, help="Temperature (0=deterministic, 1=random)")
     parser.add_argument("--topk", type=int, default=40, help="Top-K sampling")
-    parser.add_argument("--rep", type=float, default=1.3, help="Repetition penalty (>1.0 μειώνει επαναλήψεις)")
-    parser.add_argument("--maxtokens", type=int, default=80, help="Μέγιστο μήκος απάντησης")
-    parser.add_argument("--quick", type=str, default=None, help="Quick test (π.χ. --quick 'Who are you?')")
-    parser.add_argument("--novis", action="store_true", help="Απενεργοποίηση live visualization")
+    parser.add_argument("--rep", type=float, default=1.1, help="Repetition penalty (>1.0 reduces repetition)")
+    parser.add_argument("--maxtokens", type=int, default=80, help="Maximum response length")
+    parser.add_argument("--quick", type=str, default=None, help="Single-turn test (e.g. --quick 'Who are you?')")
+    parser.add_argument("--novis", action="store_true", help="Disable live visualization")
     args = parser.parse_args()
 
     if os.path.exists("checkpoints/checkpoint_best.pt"):
