@@ -20,7 +20,7 @@ Aether is a compact language model built on the **RWKV v4 architecture** — a r
 - **Bilingual** — trained on 500MB synthetic English & Greek text
 - **8,192-token vocabulary** — byte-level BPE tokenizer
 
-![Aether Architecture](docs/images/03_architecture.png)
+![Aether Architecture](images/03_architecture.png)
 
 ---
 
@@ -42,7 +42,7 @@ Input → Embedding → [Block × 14] → LayerNorm → Linear Head → Output
 - Training: O(T) per token (parallelizable like Transformers)
 - Inference: O(1) per token (constant memory, no cache growth)
 
-![Model Statistics](docs/images/02_overview.png)
+![Model Statistics](images/02_overview.png)
 
 ---
 
@@ -106,7 +106,7 @@ aether/
 - **30% Q&A pairs** — question-answer format
 - **10% multi-turn conversations** — dialog sequences
 
-![Dataset Composition](docs/images/05_dataset.png)
+![Dataset Composition](images/05_dataset.png)
 
 **Tokenizer:**
 - Byte-level BPE (no OOV tokens)
@@ -128,7 +128,7 @@ aether/
 | Optimizer | AdamW (weight decay 0.1) |
 | Precision | AMP fp16 (CUDA) / fp32 (CPU) |
 
-![Training Config](docs/images/04_config.png)
+![Training Config](images/04_config.png)
 
 ---
 
@@ -140,7 +140,7 @@ Full technical documentation, architecture diagrams, and training details:
 
 > **Note**: The interactive model card includes complete architecture breakdowns, training hyperparameters, dataset statistics, RWKV mechanism explanations, and performance visualizations.
 
-![How RWKV Works](docs/images/06_how_it_works.png)
+![How RWKV Works](images/06_how_it_works.png)
 
 ---
 
@@ -151,7 +151,7 @@ Full technical documentation, architecture diagrams, and training details:
 - **Memory**: O(1) per token (constant state size)
 - **Context length**: Unlimited (recurrent architecture)
 
-![Performance Charts](docs/images/07_charts.png)
+![Performance Charts](images/07_charts.png)
 
 ---
 
