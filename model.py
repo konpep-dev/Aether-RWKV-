@@ -203,7 +203,14 @@ class RWKV(nn.Module):
         return logits, None
 
     def forward_step(self, x, state):
-        x = self.embed(x).squeeze(1).squeeze(0)
+        # x: [1, 1] or [1] - single token
+        x = self.embed(x)
+        # Squeeze to [hidden_size] for recurrent processing
+        if x.dim() == 3:
+            x = x.squeeze(0).squeeze(0)  # [1,1,H] -> [H]
+        elif x.dim() == 2:
+            x = x.squeeze(0)  # [1,H] -> [H]
+        
         new_states = []
         for i, block in enumerate(self.blocks):
             att_state = state[i]
@@ -212,8 +219,9 @@ class RWKV(nn.Module):
             if self._block_outputs is not None:
                 self._block_outputs.append(x.abs().mean().item())
         x = self.ln_out(x)
-        logits = self.head(x)
-        return logits, new_states
+        logits = self.head(x)  # [vocab_size]
+        # Always return [1, vocab_size] for consistency
+        return logits.unsqueeze(0), new_states
 
     def init_state(self, batch_size=1, device='cpu', dtype=None):
         if dtype is None:
@@ -255,30 +263,35 @@ class RWKV(nn.Module):
         
         # Generate new tokens
         for _ in range(max_new):
-            # Get logits for next token
-            logits = logits[0]  # [vocab_size]
+            # Get logits for next token - shape [1, vocab_size] -> [vocab_size]
+            lgs = logits[0].clone()
             
             # Apply repetition penalty
             if repetition_penalty != 1.0:
-                for prev_id in set(all_ids):
-                    if prev_id < len(logits):
-                        logits[prev_id] /= repetition_penalty
+                for prev_id in set(all_ids[-64:]):  # only last 64 tokens
+                    if prev_id < len(lgs):
+                        if lgs[prev_id] > 0:
+                            lgs[prev_id] /= repetition_penalty
+                        else:
+                            lgs[prev_id] *= repetition_penalty
             
             # Apply temperature
-            logits = logits / max(temperature, 1e-6)
+            lgs = lgs / max(temperature, 1e-6)
             
             # Top-k sampling
             if top_k > 0:
-                top_k_actual = min(top_k, logits.size(-1))
-                indices_to_remove = logits < torch.topk(logits, top_k_actual)[0][..., -1, None]
-                logits[indices_to_remove] = float('-inf')
+                top_k_actual = min(top_k, lgs.size(-1))
+                vals, _ = torch.topk(lgs, top_k_actual)
+                lgs[lgs < vals[-1]] = float('-inf')
             
             # Sample next token
-            probs = torch.softmax(logits, dim=-1)
+            probs = torch.softmax(lgs, dim=-1)
             next_id = torch.multinomial(probs, num_samples=1).item()
             
             # Check stop condition
             if next_id in stop_tokens:
+                break
+            if next_id == 2:  # EOS token
                 break
             
             all_ids.append(next_id)

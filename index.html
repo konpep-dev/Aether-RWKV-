@@ -385,9 +385,9 @@
         <tr><td>Vocabulary</td><td class="num">8,192 (byte-level BPE)</td></tr>
         <tr><td>Dropout</td><td class="num">0.1</td></tr>
         <tr><td>Max sequence length</td><td class="num">256 tokens</td></tr>
-        <tr><td>Micro-batch size</td><td class="num">24</td></tr>
-        <tr><td>Gradient accumulation</td><td class="num">2 steps</td></tr>
-        <tr><td>Effective batch size</td><td class="num">48</td></tr>
+        <tr><td>Micro-batch size</td><td class="num">36</td></tr>
+        <tr><td>Gradient accumulation</td><td class="num">4 steps</td></tr>
+        <tr><td>Effective batch size</td><td class="num">144</td></tr>
         <tr><td>Epochs</td><td class="num">3</td></tr>
         <tr><td>Learning rate</td><td class="num">3e-4, cosine decay to 1e-5</td></tr>
         <tr><td>Warmup steps</td><td class="num">100</td></tr>
@@ -402,62 +402,42 @@
   <section id="dataset">
     <div class="eyebrow">04 — Dataset &amp; Tokenizer</div>
     <h2>Corpus: Aether Dataset Generator v6</h2>
-    <p>Training source: <code>aether_dataset_mixed.jsonl</code>, ~500MB of synthetic, bilingual English/Greek text produced by a rule-based generator built on a curated knowledge base rather than fill-in-the-blank templates. 40 subjects (20 English, 20 Greek) each carry 10–15 hand-grounded facts and 2–4 real-world applications, which the generator recombines into flowing paragraphs, Q&amp;A pairs, and multi-turn conversations.</p>
+    <p>Training source: <code>aether_dataset_mixed.jsonl</code>, ~505MB of synthetic, bilingual English/Greek text produced by a rule-based generator built on a curated knowledge base rather than fill-in-the-blank templates. 40 subjects (20 English, 20 Greek) each carry 10–15 hand-grounded facts and 2–4 real-world applications, which the generator recombines into flowing paragraphs, Q&amp;A pairs, and multi-turn conversations.</p>
     <p>Each line is a JSON object with a single <code>text</code> field; sequences are clipped to 256 tokens with <code>&lt;bos&gt;</code>/<code>&lt;eos&gt;</code> markers and right-padded for batching.</p>
 
     <div class="chart-row" style="margin-top:22px;">
       <div class="chart-box">
-        <div class="bar-title">Generation Phases 1–6 (fixed)</div>
+        <div class="bar-title">Dataset composition</div>
         <svg viewBox="0 0 320 210" class="bar-svg">
-          <line x1="34" y1="8" x2="34" y2="176" stroke="#ddd5c2" stroke-width="1"/>
-          <line x1="34" y1="176" x2="310" y2="176" stroke="#1c1b19" stroke-width="1"/>
-          <!-- EN raw 4000 -->
-          <rect x="42" y="16" width="26" height="160" fill="#9a3324"/>
-          <text x="55" y="192" text-anchor="middle" class="bar-lbl" font-size="9">EN raw</text>
-          <text x="55" y="10" text-anchor="middle" class="bar-val" font-size="9">4,000</text>
-          <!-- GR raw 4000 -->
-          <rect x="76" y="16" width="26" height="160" fill="#9a3324"/>
-          <text x="89" y="192" text-anchor="middle" class="bar-lbl" font-size="9">GR raw</text>
-          <text x="89" y="10" text-anchor="middle" class="bar-val" font-size="9">4,000</text>
-          <!-- EN QA 2000 -->
-          <rect x="118" y="96" width="26" height="80" fill="#c97a4a"/>
-          <text x="131" y="90" text-anchor="middle" class="bar-val" font-size="9">2,000</text>
-          <text x="131" y="192" text-anchor="middle" class="bar-lbl" font-size="9">EN Q&amp;A</text>
-          <!-- GR QA 2000 -->
-          <rect x="152" y="96" width="26" height="80" fill="#c97a4a"/>
-          <text x="165" y="90" text-anchor="middle" class="bar-val" font-size="9">2,000</text>
-          <text x="165" y="192" text-anchor="middle" class="bar-lbl" font-size="9">GR Q&amp;A</text>
-          <!-- EN multi 1000 -->
-          <rect x="194" y="136" width="26" height="40" fill="#3f3a32"/>
-          <text x="207" y="130" text-anchor="middle" class="bar-val" font-size="9">1,000</text>
-          <text x="207" y="192" text-anchor="middle" class="bar-lbl" font-size="8.5">EN multi</text>
-          <!-- GR multi 1000 -->
-          <rect x="228" y="136" width="26" height="40" fill="#3f3a32"/>
-          <text x="241" y="130" text-anchor="middle" class="bar-val" font-size="9">1,000</text>
-          <text x="241" y="192" text-anchor="middle" class="bar-lbl" font-size="8.5">GR multi</text>
+          <line x1="60" y1="8" x2="60" y2="176" stroke="#ddd5c2" stroke-width="1"/>
+          <line x1="60" y1="176" x2="290" y2="176" stroke="#1c1b19" stroke-width="1"/>
+          <!-- Raw 40% -->
+          <rect x="90" y="56" width="50" height="120" fill="#9a3324"/>
+          <text x="115" y="48" text-anchor="middle" class="bar-val">278K</text>
+          <text x="115" y="196" text-anchor="middle" class="bar-lbl">Raw (40%)</text>
+          <!-- Q&A 60% -->
+          <rect x="180" y="16" width="50" height="160" fill="#c97a4a"/>
+          <text x="205" y="10" text-anchor="middle" class="bar-val">417K</text>
+          <text x="205" y="196" text-anchor="middle" class="bar-lbl">Q&amp;A (60%)</text>
         </svg>
-        <div class="chart-note">14,000 fixed entries before Phase 7 fills the remainder to 500MB by alternating EN/GR raw and Q&amp;A.</div>
+        <div class="chart-note">695,447 total entries, interleaved 2 raw : 3 Q&amp;A, no shuffle. ~505MB total.</div>
       </div>
 
       <div class="chart-box">
         <svg viewBox="0 0 280 240" class="pie-svg">
           <circle cx="140" cy="120" r="90" fill="none" stroke="#e6dcc6" stroke-width="34"/>
-          <!-- Raw paragraphs 60% -->
+          <!-- Raw 40% -->
           <circle cx="140" cy="120" r="90" fill="none" stroke="#9a3324" stroke-width="34"
-            stroke-dasharray="339.3 565.5" stroke-dashoffset="0" transform="rotate(-90 140 120)"/>
-          <!-- Q&A 30% -->
+            stroke-dasharray="226.2 565.5" stroke-dashoffset="0" transform="rotate(-90 140 120)"/>
+          <!-- Q&A 60% -->
           <circle cx="140" cy="120" r="90" fill="none" stroke="#c97a4a" stroke-width="34"
-            stroke-dasharray="169.6 565.5" stroke-dashoffset="-339.3" transform="rotate(-90 140 120)"/>
-          <!-- Multi-turn 10% -->
-          <circle cx="140" cy="120" r="90" fill="none" stroke="#3f3a32" stroke-width="34"
-            stroke-dasharray="56.5 565.5" stroke-dashoffset="-508.9" transform="rotate(-90 140 120)"/>
-          <text x="140" y="114" text-anchor="middle" class="pie-num">~55K</text>
+            stroke-dasharray="339.3 565.5" stroke-dashoffset="-226.2" transform="rotate(-90 140 120)"/>
+          <text x="140" y="114" text-anchor="middle" class="pie-num">~695K</text>
           <text x="140" y="134" text-anchor="middle" class="pie-lbl">entries</text>
         </svg>
         <div class="legend">
-          <div class="legend-row"><span class="swatch" style="background:#9a3324"></span>Raw paragraphs <span class="legend-pct">60%</span></div>
-          <div class="legend-row"><span class="swatch" style="background:#c97a4a"></span>Q&amp;A pairs <span class="legend-pct">30%</span></div>
-          <div class="legend-row"><span class="swatch" style="background:#3f3a32"></span>Multi-turn <span class="legend-pct">10%</span></div>
+          <div class="legend-row"><span class="swatch" style="background:#9a3324"></span>Raw paragraphs <span class="legend-pct">40%</span></div>
+          <div class="legend-row"><span class="swatch" style="background:#c97a4a"></span>Q&amp;A pairs <span class="legend-pct">60%</span></div>
         </div>
       </div>
     </div>
@@ -469,10 +449,13 @@
         <tr><td>Facts per subject</td><td class="num">10–15</td></tr>
         <tr><td>Total unique facts</td><td class="num">~500–600</td></tr>
         <tr><td>Applications per subject</td><td class="num">2–4</td></tr>
-        <tr><td>Total entries (est.)</td><td class="num">~50,000–60,000</td></tr>
-        <tr><td>Total tokens (est.)</td><td class="num">~100–125 million</td></tr>
+        <tr><td>Total entries</td><td class="num">695,447</td></tr>
+        <tr><td>Raw entries</td><td class="num">278,178 (40%)</td></tr>
+        <tr><td>Q&amp;A entries</td><td class="num">417,269 (60%)</td></tr>
+        <tr><td>File size</td><td class="num">~505 MB</td></tr>
+        <tr><td>Interleave order</td><td class="num">2 raw : 3 Q&amp;A (no shuffle)</td></tr>
         <tr><td>Language split</td><td class="num">~50% English / ~50% Greek</td></tr>
-        <tr><td>Exact-duplicate rate</td><td class="num">&lt; 2%</td></tr>
+        <tr><td>Total unique facts</td><td class="num">~500–600</td></tr>
         <tr><td>Facts sampled per paragraph</td><td class="num">3–7, shuffled</td></tr>
         <tr><td>Connector / closer variety</td><td class="num">~30 connectors, ~20 closers</td></tr>
       </tbody>

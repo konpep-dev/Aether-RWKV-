@@ -2,7 +2,7 @@
 AETHER DATASET GENERATOR v6 — High Quality Bilingual (EN+GR)
   Strategy: Coherent, factually grounded, subject-specific entries.
   Each entry uses subject-aware facts, NOT random template combinations.
-  Target: 500MB, ~50% EN / 50% GR, minimal repetition.
+  Target: 512MB, ~40% raw / 60% Q&A, ordered interleave.
   
   Identity Strategy: Aether identity is present but not overwhelming (~2% frequency)
 """
@@ -1002,11 +1002,85 @@ def multi_entry(turns: list) -> dict:
 
 
 # ===================================================================
+#  DATASET BALANCE HELPERS
+# ===================================================================
+
+TARGET_BYTES = 512 * 1024 * 1024  # 512 MiB output file
+RAW_RATIO = 0.40
+
+
+def entry_bytes(entry):
+    return len(json.dumps(entry, ensure_ascii=False).encode("utf-8")) + 1
+
+
+def take_until_bytes(entries, byte_limit):
+    kept, total = [], 0
+    for e in entries:
+        sz = entry_bytes(e)
+        if total + sz > byte_limit:
+            break
+        kept.append(e)
+        total += sz
+    return kept, total
+
+
+def interleave_entries(raw_list, qa_list, raw_per=2, qa_per=3):
+    """Ordered interleave: 2 raw, 3 Q&A, repeat — no random shuffle."""
+    out, ri, qi = [], 0, 0
+    while ri < len(raw_list) or qi < len(qa_list):
+        for _ in range(raw_per):
+            if ri < len(raw_list):
+                out.append(raw_list[ri])
+                ri += 1
+        for _ in range(qa_per):
+            if qi < len(qa_list):
+                out.append(qa_list[qi])
+                qi += 1
+    return out
+
+
+def fill_raw_to_target(raw_kept, raw_bytes, raw_target):
+    lang_toggle = 0
+    while raw_bytes < raw_target:
+        if lang_toggle % 2 == 0:
+            subj = pick_subject(SUBJECTS_EN, identity_weight=0.02)
+            entry = raw_entry(build_en_paragraph(subj))
+        else:
+            subj = pick_subject(SUBJECTS_GR, identity_weight=0.02)
+            entry = raw_entry(build_gr_paragraph(subj))
+        lang_toggle += 1
+        sz = entry_bytes(entry)
+        if raw_bytes + sz > raw_target:
+            break
+        raw_kept.append(entry)
+        raw_bytes += sz
+    return raw_kept, raw_bytes
+
+
+def fill_qa_to_target(qa_kept, qa_bytes, qa_target):
+    lang_toggle = 0
+    while qa_bytes < qa_target:
+        if lang_toggle % 2 == 0:
+            subj = pick_subject(SUBJECTS_EN, identity_weight=0.02)
+            entry = qa_entry(pick(Q_EN).format(subj["name"]), build_en_answer(subj), pick(EMOTION_TAGS))
+        else:
+            subj = pick_subject(SUBJECTS_GR, identity_weight=0.02)
+            entry = qa_entry(pick(Q_GR).format(subj["name"]), build_gr_answer(subj), pick(EMOTION_TAGS))
+        lang_toggle += 1
+        sz = entry_bytes(entry)
+        if qa_bytes + sz > qa_target:
+            break
+        qa_kept.append(entry)
+        qa_bytes += sz
+    return qa_kept, qa_bytes
+
+
+# ===================================================================
 #  MAIN GENERATION
 # ===================================================================
 
 def generate():
-    target_bytes = 500 * 1024 * 1024
+    target_bytes = TARGET_BYTES
     output_path = "aether_dataset.jsonl"
     total = 0
 
@@ -1017,32 +1091,26 @@ def generate():
             f.write(json.dumps(entry, ensure_ascii=False) + "\n")
             total += 1
 
-        # ── Phase 1: EN raw paragraphs (many passes, varied facts) ──
-        # Raw text for general language understanding (NO user/assistant format)
-        # MAXIMUM RAW DATA for strong pre-training base
+        # ── Phase 1: EN raw paragraphs ──
         print("Phase 1: EN raw paragraphs (pre-training style)...")
-        for pass_num in range(15000):  # 15000 × 19 = ~285K entries! (skip Aether 95%)
+        for pass_num in range(3500):
             for idx, subj in enumerate(SUBJECTS_EN):
-                # Skip Aether 95% of the time to reduce frequency
                 if idx == 0 and random.random() > 0.05:
                     continue
                 write(raw_entry(build_en_paragraph(subj)))
 
         # ── Phase 2: GR raw paragraphs ──
         print("Phase 2: GR raw paragraphs (pre-training style)...")
-        for pass_num in range(15000):  # 15000 × 19 = ~285K entries!
+        for pass_num in range(3500):
             for idx, subj in enumerate(SUBJECTS_GR):
-                # Skip Aether 95% of the time to reduce frequency
                 if idx == 0 and random.random() > 0.05:
                     continue
                 write(raw_entry(build_gr_paragraph(subj)))
 
         # ── Phase 3: EN single-turn Q&A ──
-        # Structured Q&A in User:/Aether: format
         print("Phase 3: EN Q&A (User/Aether format)...")
-        for pass_num in range(100):
+        for pass_num in range(300):
             for idx, subj in enumerate(SUBJECTS_EN):
-                # Skip Aether 95% of the time to reduce frequency
                 if idx == 0 and random.random() > 0.05:
                     continue
                 q = pick(Q_EN).format(subj["name"])
@@ -1052,9 +1120,8 @@ def generate():
 
         # ── Phase 4: GR single-turn Q&A ──
         print("Phase 4: GR Q&A (User/Aether format)...")
-        for pass_num in range(100):
+        for pass_num in range(300):
             for idx, subj in enumerate(SUBJECTS_GR):
-                # Skip Aether 95% of the time to reduce frequency
                 if idx == 0 and random.random() > 0.05:
                     continue
                 q = pick(Q_GR).format(subj["name"])
@@ -1064,9 +1131,8 @@ def generate():
 
         # ── Phase 5: EN multi-turn conversations ──
         print("Phase 5: EN multi-turn (User/Aether format)...")
-        for pass_num in range(200):  # Increased from 50 to 200
+        for pass_num in range(200):
             for idx, subj in enumerate(SUBJECTS_EN):
-                # Skip Aether 95% of the time to reduce frequency
                 if idx == 0 and random.random() > 0.05:
                     continue
                 q = pick(Q_EN).format(subj["name"])
@@ -1083,9 +1149,8 @@ def generate():
 
         # ── Phase 6: GR multi-turn conversations ──
         print("Phase 6: GR multi-turn (User/Aether format)...")
-        for pass_num in range(200):  # Increased from 50 to 200
+        for pass_num in range(200):
             for idx, subj in enumerate(SUBJECTS_GR):
-                # Skip Aether 95% of the time to reduce frequency
                 if idx == 0 and random.random() > 0.05:
                     continue
                 q = pick(Q_GR).format(subj["name"])
@@ -1100,36 +1165,47 @@ def generate():
                 ]
                 write(multi_entry(turns))
 
-        # ── Phase 7: Fill remaining space ──
-        # ONLY Q&A format from here on (no more raw text)
-        print("Phase 7: Filling to 500MB (Q&A format only)...")
-        iteration = 0
-        while True:
-            current_size = os.path.getsize(output_path)
-            if current_size >= target_bytes:
-                break
+    pre_mb = os.path.getsize(output_path) / 1024 / 1024
+    print(f"\nPhases 1-6 done: {total:,} entries, {pre_mb:.1f} MB (temporary file)")
 
-            # Alternate EN/GR Q&A (NO raw entries!)
-            # Use weighted selection: Aether appears ~2% of the time
-            if iteration % 2 == 0:
-                # English Q&A
-                subj = pick_subject(SUBJECTS_EN, identity_weight=0.02)
-                q = pick(Q_EN).format(subj["name"])
-                a = build_en_answer(subj)
-                write(qa_entry(q, a, pick(EMOTION_TAGS)))
-            else:
-                # Greek Q&A
-                subj = pick_subject(SUBJECTS_GR, identity_weight=0.02)
-                q = pick(Q_GR).format(subj["name"])
-                a = build_gr_answer(subj)
-                write(qa_entry(q, a, pick(EMOTION_TAGS)))
+    # ── Phase 7: Balance to exactly 512MB — 40% raw / 60% Q&A, fill if short ──
+    print(f"\nPhase 7: Balancing to {target_bytes / 1024 / 1024:.0f} MB (40% raw / 60% Q&A)...")
+    entries = []
+    with open(output_path, "r", encoding="utf-8") as f:
+        for line in f:
+            entries.append(json.loads(line))
+    raw_entries = [e for e in entries if "User:" not in e.get("text", "")]
+    qa_entries = [e for e in entries if "User:" in e.get("text", "")]
 
-            iteration += 1
+    target_raw_bytes = int(target_bytes * RAW_RATIO)
+    target_qa_bytes = target_bytes - target_raw_bytes
 
-    mb = os.path.getsize(output_path) / 1024 / 1024
+    raw_kept, raw_bytes = take_until_bytes(raw_entries, target_raw_bytes)
+    qa_kept, qa_bytes = take_until_bytes(qa_entries, target_qa_bytes)
+
+    if raw_bytes < target_raw_bytes:
+        need_mb = (target_raw_bytes - raw_bytes) / 1024 / 1024
+        print(f"  Generating +{need_mb:.1f} MB raw (had only {raw_bytes/1024/1024:.1f} MB)...")
+        raw_kept, raw_bytes = fill_raw_to_target(raw_kept, raw_bytes, target_raw_bytes)
+
+    if qa_bytes < target_qa_bytes:
+        need_mb = (target_qa_bytes - qa_bytes) / 1024 / 1024
+        print(f"  Generating +{need_mb:.1f} MB Q&A (had only {qa_bytes/1024/1024:.1f} MB)...")
+        qa_kept, qa_bytes = fill_qa_to_target(qa_kept, qa_bytes, target_qa_bytes)
+
+    balanced = interleave_entries(raw_kept, qa_kept, raw_per=2, qa_per=3)
+    with open(output_path, "w", encoding="utf-8") as f:
+        for e in balanced:
+            f.write(json.dumps(e, ensure_ascii=False) + "\n")
+
+    final_bytes = os.path.getsize(output_path)
+    mb = final_bytes / 1024 / 1024
     print(f"\n✅ Done!")
-    print(f"   Total entries : {total:,}")
-    print(f"   File size     : {mb:.1f} MB")
+    print(f"   Total entries : {len(balanced):,} (raw {len(raw_kept):,} / Q&A {len(qa_kept):,})")
+    print(f"   Raw section   : {raw_bytes/1024/1024:.1f} MB (target {target_raw_bytes/1024/1024:.1f} MB)")
+    print(f"   Q&A section   : {qa_bytes/1024/1024:.1f} MB (target {target_qa_bytes/1024/1024:.1f} MB)")
+    print(f"   File size     : {mb:.2f} MB ({final_bytes:,} bytes)")
+    print(f"   Order         : interleaved 2 raw : 3 Q&A")
 
 
 if __name__ == "__main__":

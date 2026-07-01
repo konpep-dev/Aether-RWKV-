@@ -165,7 +165,7 @@ def warmup_wkv_kernel(device='cuda', hidden_size=640):
     torch.cuda.synchronize()
     
     if HAS_TRITON:
-        print("✅ Triton CUDA kernel ready")
+        print("[OK] Triton CUDA kernel ready")
     else:
-        print("✅ TorchScript JIT kernel ready (install triton for 2-3x more speed)")
+        print("[OK] TorchScript JIT kernel ready (install triton for 2-3x more speed)")
 

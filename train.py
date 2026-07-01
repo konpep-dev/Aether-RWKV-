@@ -15,9 +15,9 @@ DATASET_PATH = "aether_dataset_mixed.jsonl"
 MODEL_SAVE_PATH = "aether_model.pt"
 TOKENIZER_SAVE_PATH = "aether_tokenizer.json"
 CKPT_DIR = "checkpoints"
-BATCH_SIZE = 64
-ACCUM_STEPS = 4  # Effective batch = 64 * 4 = 256
-MAX_LENGTH = 256
+BATCH_SIZE = 36
+ACCUM_STEPS = 4  # Effective batch = 36 * 4 = 144
+MAX_LENGTH = 256  # Covers full Q&A answers, fits T4 with batch 36
 EPOCHS = 3
 LEARNING_RATE = 3e-4
 WARMUP_STEPS = 100
@@ -31,35 +31,112 @@ TEST_INTERVAL = 1000
 DRIVE_DIR = os.environ.get("DRIVE_DIR", "")
 
 TEST_PROMPTS = [
-    "Hello, how are you?",
-    "What is machine learning?",
-    "Tell me a joke.",
-    "How are you doing today?",
+    "User: Hello, how are you?\n\nAether:",
+    "User: What is machine learning?\n\nAether:",
+    "User: Tell me about black holes.\n\nAether:",
+    "User: Γεια σου, τι κάνεις;\n\nAether:",
+    "User: Τι είναι η τεχνητή νοημοσύνη;\n\nAether:",
 ]
 
 os.makedirs(CKPT_DIR, exist_ok=True)
 
-# ── Dataset (memory efficient: loads on demand, no full copy) ──
+def is_qa_sample(text):
+    return "User:" in text and "Aether:" in text
+
+def sample_tokenizer_texts(path, n=2000, qa_ratio=0.6, seed=42):
+    """Sample mixed raw + Q&A lines for BPE (not just file-head raw text)."""
+    import random
+    rng = random.Random(seed)
+    raw, qa = [], []
+    with open(path, "r", encoding="utf-8") as f:
+        for line in f:
+            text = json.loads(line)["text"]
+            (qa if is_qa_sample(text) else raw).append(text)
+    n_qa = min(len(qa), int(n * qa_ratio))
+    n_raw = min(len(raw), n - n_qa)
+    texts = rng.sample(qa, n_qa) + rng.sample(raw, n_raw)
+    rng.shuffle(texts)
+    return texts
+
+def truncate_ids(ids, max_length, text, tokenizer):
+    """For Q&A, prefer keeping the Aether: answer when truncating."""
+    if len(ids) <= max_length:
+        return ids
+    if "Aether:" not in text:
+        return ids[:max_length]
+    pos = text.rfind("Aether:")
+    prefix_ids = tokenizer.encode(text[:pos], add_bos=True, add_eos=False)
+    suffix_ids = tokenizer.encode(text[pos:], add_bos=False, add_eos=True)
+    if len(suffix_ids) >= max_length:
+        return suffix_ids[:max_length]
+    keep_prefix = max_length - len(suffix_ids)
+    return prefix_ids[-keep_prefix:] + suffix_ids
+
+def mask_before_assistant(tgt, ids, tokenizer):
+    """Loss only on Aether: response tokens (ignore User: prefix)."""
+    marker = tokenizer.encode("Aether:", add_bos=False, add_eos=False)
+    if not marker:
+        return tgt
+    for i in range(len(ids) - len(marker) + 1):
+        if ids[i:i + len(marker)] == marker:
+            end = i + len(marker) - 1
+            if end > 0:
+                tgt[:end] = 0
+            break
+    return tgt
+
+def build_interleaved_order(raw_list, qa_list, raw_per=2, qa_per=3):
+    """All samples in order: 2 raw, 3 Q&A, repeat — no random shuffle."""
+    order, ri, qi = [], 0, 0
+    while ri < len(raw_list) or qi < len(qa_list):
+        for _ in range(raw_per):
+            if ri < len(raw_list):
+                order.append(("raw", ri))
+                ri += 1
+        for _ in range(qa_per):
+            if qi < len(qa_list):
+                order.append(("qa", qi))
+                qi += 1
+    return order
+
+# ── Dataset (ordered interleave, 100% of data) ──
 class TextDataset(Dataset):
-    def __init__(self, path, tokenizer, max_length=128):
+    def __init__(self, path, tokenizer, max_length=192):
         self.tokenizer = tokenizer
         self.max_length = max_length
-        self.path = path
+        self.raw_samples, self.qa_samples = [], []
         with open(path, "r", encoding="utf-8") as f:
-            self.samples = [json.loads(line)["text"] for line in f]
-        print(f"Loaded {len(self.samples):,} samples ({self._estimate_mb():.1f}MB)")
+            for line in f:
+                text = json.loads(line)["text"]
+                (self.qa_samples if is_qa_sample(text) else self.raw_samples).append(text)
+        self.order = build_interleaved_order(self.raw_samples, self.qa_samples)
+        total = len(self.raw_samples) + len(self.qa_samples)
+        qa = len(self.qa_samples)
+        print(f"Loaded ALL {total:,} samples ({self._estimate_mb():.1f}MB)")
+        print(f"  Q&A: {qa:,} ({100*qa/total:.1f}%) | Raw: {len(self.raw_samples):,}")
+        print(f"  Order: 2 raw -> 3 Q&A interleaved (shuffle=False)")
 
     def _estimate_mb(self):
-        return sum(len(s) for s in self.samples[:1000]) * len(self.samples) / 1000 / 1024 / 1024
+        n = len(self.raw_samples) + len(self.qa_samples)
+        sample = (self.raw_samples[:500] + self.qa_samples[:500])[:1000]
+        return sum(len(s) for s in sample) * n / max(len(sample), 1) / 1024 / 1024
+
+    def _get_text(self, idx):
+        kind, i = self.order[idx]
+        return self.qa_samples[i] if kind == "qa" else self.raw_samples[i]
 
     def __len__(self):
-        return len(self.samples)
+        return len(self.order)
 
     def __getitem__(self, idx):
-        ids = self.tokenizer.encode(self.samples[idx], add_bos=True, add_eos=True)
-        if len(ids) > self.max_length:
-            ids = ids[:self.max_length]
-        return torch.tensor(ids[:-1], dtype=torch.long), torch.tensor(ids[1:], dtype=torch.long)
+        text = self._get_text(idx)
+        ids = self.tokenizer.encode(text, add_bos=True, add_eos=True)
+        ids = truncate_ids(ids, self.max_length, text, self.tokenizer)
+        inp = torch.tensor(ids[:-1], dtype=torch.long)
+        tgt = torch.tensor(ids[1:], dtype=torch.long)
+        if is_qa_sample(text):
+            tgt = mask_before_assistant(tgt, ids, self.tokenizer)
+        return inp, tgt
 
 def collate(batch):
     """Fast collation using pad_sequence"""
@@ -79,10 +156,15 @@ def run_test(model, tokenizer, global_step):
     print(f"Test at step {global_step}:")
     for prompt in TEST_PROMPTS:
         ids = tokenizer.encode(prompt, add_bos=True, add_eos=False)
-        gen = model.generate(ids, max_new=20, temperature=0.3, top_k=10, repetition_penalty=1.0)
-        out = tokenizer.decode(gen, skip_special=True)
+        gen = model.generate(ids, max_new=40, temperature=0.5, top_k=20, repetition_penalty=1.1)
+        new_ids = gen[len(ids):]
+        out = tokenizer.decode(new_ids, skip_special=True)
+        cut = out.find("User:")
+        if cut != -1:
+            out = out[:cut].rstrip()
         ascii_out = out.encode('ascii', errors='replace').decode('ascii')
-        print(f"  Q: {prompt}")
+        q_short = prompt.split("\n\nAether:")[0].replace("User: ", "")
+        print(f"  Q: {q_short}")
         print(f"  A: {ascii_out}")
     print(f"{'='*50}\n")
     model.train()
@@ -120,12 +202,7 @@ def train():
         tokenizer.load(TOKENIZER_SAVE_PATH)
         print(f"Loaded tokenizer — vocab={tokenizer.get_vocab_size()}")
     else:
-        texts = []
-        with open(DATASET_PATH, "r", encoding="utf-8") as f:
-            for i, line in enumerate(f):
-                if i >= 2000:
-                    break
-                texts.append(json.loads(line)["text"])
+        texts = sample_tokenizer_texts(DATASET_PATH, n=2000, qa_ratio=0.6)
         tokenizer.train(texts, max_texts=2000)
         tokenizer.save(TOKENIZER_SAVE_PATH)
         print(f"Trained tokenizer — vocab={tokenizer.get_vocab_size()}")
@@ -136,7 +213,7 @@ def train():
     dataset = TextDataset(DATASET_PATH, tokenizer, MAX_LENGTH)
     num_workers = 0 if os.name == 'nt' else 4  # More workers for data loading
     prefetch_factor = 2 if num_workers > 0 else None
-    loader = DataLoader(dataset, batch_size=BATCH_SIZE, shuffle=True,
+    loader = DataLoader(dataset, batch_size=BATCH_SIZE, shuffle=False,
                         collate_fn=collate, num_workers=num_workers,
                         pin_memory=(device=='cuda'), drop_last=True,
                         prefetch_factor=prefetch_factor, persistent_workers=(num_workers > 0))
