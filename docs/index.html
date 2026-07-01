@@ -1,0 +1,800 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Aether — RWKV v4, 51.1M Parameters</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,wght@0,400;0,500;0,600;0,700;1,400&family=Lora:wght@400;500;600;700&display=swap');
+  :root{
+    --paper:#faf6ee;
+    --ink:#1c1b19;
+    --ink-soft:#5c5850;
+    --rule:#ddd5c2;
+    --accent:#9a3324;
+    --mono-bg:#f3ecdc;
+    --mono-border:#e6dcc6;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{
+    background:var(--paper);
+    color:var(--ink);
+    font-family:'Source Serif 4',Georgia,serif;
+    line-height:1.65;
+    font-size:16.5px;
+  }
+  .wrap{max-width:880px;margin:0 auto;padding:0 28px;}
+
+  /* Masthead */
+  header.masthead{
+    border-bottom:3px double var(--ink);
+    padding:48px 0 18px;
+  }
+  .kicker{
+    font-family:'Courier New',ui-monospace,Menlo,monospace;
+    font-size:11px;
+    letter-spacing:0.18em;
+    text-transform:uppercase;
+    color:var(--accent);
+    margin-bottom:14px;
+  }
+  h1.title{
+    font-size:48px;
+    font-weight:700;
+    letter-spacing:-0.01em;
+    line-height:1.05;
+  }
+  .subtitle{
+    margin-top:14px;
+    font-size:18.5px;
+    color:var(--ink-soft);
+    font-style:italic;
+    max-width:660px;
+    line-height:1.6;
+  }
+  .subtitle strong{
+    font-style:normal;
+    font-weight:600;
+    color:var(--ink);
+  }
+  .byline{
+    margin-top:16px;
+    font-family:'Courier New',ui-monospace,Menlo,monospace;
+    font-size:11.5px;
+    letter-spacing:0.05em;
+    color:var(--accent);
+    text-transform:uppercase;
+  }
+  .meta-row{
+    margin-top:24px;
+    display:flex;
+    flex-wrap:wrap;
+    gap:0;
+    font-family:'Courier New',ui-monospace,Menlo,monospace;
+    font-size:12px;
+    color:var(--ink-soft);
+    border-top:1px solid var(--rule);
+    padding-top:14px;
+  }
+  .meta-row span{
+    padding-right:22px;
+    border-right:1px solid var(--rule);
+    margin-right:22px;
+  }
+  .meta-row span:last-child{border-right:none;margin-right:0;padding-right:0;}
+
+  /* Sections */
+  section{padding:56px 0;border-bottom:1px solid var(--rule);}
+  section:last-of-type{border-bottom:none;}
+  .eyebrow{
+    font-family:'Courier New',ui-monospace,Menlo,monospace;
+    font-size:11px;
+    letter-spacing:0.16em;
+    text-transform:uppercase;
+    color:var(--accent);
+    margin-bottom:10px;
+  }
+  h2{
+    font-size:26px;
+    font-weight:700;
+    margin-bottom:18px;
+    letter-spacing:-0.01em;
+  }
+  p{margin-bottom:14px;max-width:680px;}
+  p:last-child{margin-bottom:0;}
+
+  /* Stat grid */
+  .stat-grid{
+    display:grid;
+    grid-template-columns:repeat(auto-fit,minmax(150px,1fr));
+    gap:1px;
+    background:var(--rule);
+    border:1px solid var(--rule);
+    margin-top:8px;
+  }
+  .stat{
+    background:var(--paper);
+    padding:18px 16px;
+  }
+  .stat .num{
+    font-size:28px;
+    font-weight:700;
+    font-variant-numeric:tabular-nums;
+    line-height:1.1;
+  }
+  .stat .lbl{
+    margin-top:6px;
+    font-family:'Courier New',ui-monospace,Menlo,monospace;
+    font-size:10.5px;
+    letter-spacing:0.08em;
+    text-transform:uppercase;
+    color:var(--ink-soft);
+  }
+
+  /* Tables */
+  table{
+    width:100%;
+    border-collapse:collapse;
+    margin-top:10px;
+    font-size:14.5px;
+  }
+  th,td{
+    text-align:left;
+    padding:9px 12px;
+    border-bottom:1px solid var(--rule);
+  }
+  th{
+    font-family:'Courier New',ui-monospace,Menlo,monospace;
+    font-size:10.5px;
+    letter-spacing:0.08em;
+    text-transform:uppercase;
+    color:var(--ink-soft);
+    font-weight:600;
+    border-bottom:2px solid var(--ink);
+  }
+  td.num, th.num{text-align:right;font-variant-numeric:tabular-nums;}
+  tr:last-child td{border-bottom:none;}
+  td code, p code{
+    font-family:'Courier New',ui-monospace,Menlo,monospace;
+    font-size:13px;
+    background:var(--mono-bg);
+    padding:1px 5px;
+    border-radius:2px;
+  }
+
+  /* Architecture block diagram */
+  .stack{
+    margin-top:18px;
+    border:1px solid var(--ink);
+  }
+  .stack-row{
+    display:flex;
+    align-items:stretch;
+    border-bottom:1px solid var(--rule);
+  }
+  .stack-row:last-child{border-bottom:none;}
+  .stack-label{
+    width:150px;
+    flex-shrink:0;
+    padding:14px 14px;
+    font-family:'Courier New',ui-monospace,Menlo,monospace;
+    font-size:11px;
+    letter-spacing:0.04em;
+    color:var(--ink-soft);
+    background:var(--mono-bg);
+    border-right:1px solid var(--rule);
+    display:flex;
+    align-items:center;
+  }
+  .stack-body{padding:14px 16px;display:flex;align-items:center;flex-wrap:wrap;gap:8px;}
+  .pill{
+    font-family:'Courier New',ui-monospace,Menlo,monospace;
+    font-size:12px;
+    padding:4px 10px;
+    border:1px solid var(--ink);
+    background:var(--paper);
+  }
+  .pill.accent{border-color:var(--accent);color:var(--accent);}
+  .arrow{color:var(--ink-soft);font-size:13px;}
+  .stack-note{
+    font-size:13px;
+    color:var(--ink-soft);
+    margin-top:4px;
+    width:100%;
+  }
+
+  /* Equation block */
+  .eq-block{
+    margin-top:16px;
+    background:var(--mono-bg);
+    border:1px solid var(--mono-border);
+    padding:10px 24px;
+  }
+  .eq-row{
+    display:grid;
+    grid-template-columns:70px 22px 1fr;
+    align-items:baseline;
+    gap:6px 14px;
+    padding:14px 0;
+    border-bottom:1px solid var(--mono-border);
+    font-family:'Courier New',ui-monospace,Menlo,monospace;
+    font-size:14.5px;
+  }
+  .eq-row:last-child{border-bottom:none;}
+  .eq-lhs{font-weight:700;text-align:right;color:var(--ink);}
+  .eq-eq{color:var(--ink-soft);}
+  .eq-rhs{color:var(--ink);letter-spacing:0.01em;}
+  .eq-rhs sub, .eq-rhs sup, .eq-lhs sub{font-family:inherit;}
+  .eq-note{
+    grid-column:1 / -1;
+    font-family:'Source Serif 4',Georgia,serif;
+    font-style:italic;
+    font-size:12.5px;
+    color:var(--ink-soft);
+    margin-top:2px;
+  }
+  .eq-key{
+    margin-top:14px;
+    font-size:12.5px;
+    color:var(--ink-soft);
+  }
+  .eq-key span{
+    font-family:'Courier New',ui-monospace,Menlo,monospace;
+    color:var(--ink);
+  }
+  @media (max-width:560px){
+    .eq-row{grid-template-columns:56px 18px 1fr;font-size:13px;}
+  }
+
+  /* repo table file col */
+  td.file{font-family:'Courier New',ui-monospace,Menlo,monospace;font-size:13px;}
+
+  footer{
+    padding:32px 0 60px;
+    font-family:'Courier New',ui-monospace,Menlo,monospace;
+    font-size:11px;
+    color:var(--ink-soft);
+    letter-spacing:0.03em;
+  }
+
+  @media (max-width:560px){
+    h1.title{font-size:34px;}
+    .stack-label{width:110px;font-size:10px;padding:12px 10px;}
+    .wrap{padding:0 18px;}
+  }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+
+  <header class="masthead">
+    <div class="kicker">Model Card · Build Spec</div>
+    <h1 class="title">Aether</h1>
+    <p class="subtitle">A 51.1M-parameter language model designed by <strong>Konpep</strong>, built on the RWKV recurrent architecture — drawing on the linear-attention formulation introduced in RWKV v4 and later refinements from RWKV v7 — and trained from scratch on a 500MB synthetic English &amp; Greek conversational corpus. Linear-time recurrence, no attention matrix, runs on CPU.</p>
+    <p class="byline">By Konpep · RWKV v4 / v7-derived architecture</p>
+    <div class="meta-row">
+      <span>51,173,120 params</span>
+      <span>~195 MB fp32</span>
+      <span>14 layers</span>
+      <span>640 hidden</span>
+      <span>head 64</span>
+      <span>vocab 8,192</span>
+    </div>
+  </header>
+
+  <section id="overview">
+    <div class="eyebrow">01 — Overview</div>
+    <h2>What this build is</h2>
+    <p>Aether is configured and trained by <code>train.py</code> in this repository using the RWKV v4 architecture defined in <code>model.py</code>. It is a sequence-to-sequence language model with no self-attention and no KV cache: every layer carries a fixed-size recurrent state forward through the sequence, so memory and compute per token stay constant regardless of context length.</p>
+    <p>The model is trained on <code>aether_dataset_mixed.jsonl</code>, a synthetic corpus of roughly 500MB mixing English and Greek conversational text, tokenized with an 8,192-vocabulary byte-level BPE tokenizer built on raw UTF-8 bytes — meaning any language or symbol is representable without an unknown-token fallback.</p>
+
+    <div class="stat-grid">
+      <div class="stat"><div class="num">51.17M</div><div class="lbl">Total Parameters</div></div>
+      <div class="stat"><div class="num">14</div><div class="lbl">Transformer Blocks</div></div>
+      <div class="stat"><div class="num">640</div><div class="lbl">Hidden Size</div></div>
+      <div class="stat"><div class="num">64</div><div class="lbl">Head Size</div></div>
+      <div class="stat"><div class="num">8,192</div><div class="lbl">Vocabulary</div></div>
+      <div class="stat"><div class="num">~195 MB</div><div class="lbl">Weights (fp32)</div></div>
+      <div class="stat"><div class="num">256</div><div class="lbl">Max Sequence Length</div></div>
+      <div class="stat"><div class="num">O(T)</div><div class="lbl">Inference Complexity</div></div>
+    </div>
+  </section>
+
+  <section id="architecture">
+    <div class="eyebrow">02 — Architecture</div>
+    <h2>RWKV v4 block stack</h2>
+    <p>Each of the 14 blocks is a pre-norm residual unit containing two sub-layers: Time-Mix (the recurrent attention replacement) and Channel-Mix (a gated feed-forward layer). Token embeddings are tied to the output projection head.</p>
+
+    <div class="stack">
+      <div class="stack-row">
+        <div class="stack-label">Input</div>
+        <div class="stack-body">
+          <span class="pill">Token IDs</span><span class="arrow">→</span>
+          <span class="pill">Embedding (8,192 × 640)</span>
+        </div>
+      </div>
+      <div class="stack-row">
+        <div class="stack-label">Block × 14</div>
+        <div class="stack-body">
+          <span class="pill">LayerNorm</span><span class="arrow">→</span>
+          <span class="pill accent">Time-Mix</span><span class="arrow">→</span>
+          <span class="pill">Residual Add</span><span class="arrow">→</span>
+          <span class="pill">LayerNorm</span><span class="arrow">→</span>
+          <span class="pill accent">Channel-Mix</span><span class="arrow">→</span>
+          <span class="pill">Residual Add</span>
+          <div class="stack-note">Time-Mix: token-shift blend, per-channel time-decay, WKV linear-attention recurrence, sigmoid receptance gate.<br>Channel-Mix: squared-ReLU key projection (gated MLP), sigmoid receptance gate, zero-initialized output for stable early training.</div>
+        </div>
+      </div>
+      <div class="stack-row">
+        <div class="stack-label">Output</div>
+        <div class="stack-body">
+          <span class="pill">Final LayerNorm</span><span class="arrow">→</span>
+          <span class="pill">Linear Head (tied weights)</span><span class="arrow">→</span>
+          <span class="pill">Logits (8,192)</span>
+        </div>
+      </div>
+    </div>
+
+    <h2 style="margin-top:34px;">Time-Mix recurrence</h2>
+    <p>The WKV operation replaces softmax attention with a numerator/denominator running state, updated once per token at O(1) cost — no quadratic attention matrix is ever formed.</p>
+    <div class="eq-block">
+      <div class="eq-row">
+        <span class="eq-lhs">x′</span>
+        <span class="eq-eq">=</span>
+        <span class="eq-rhs">x · μ + x<sub>prev</sub> · (1 − μ)</span>
+        <span class="eq-note">token-shift blend</span>
+      </div>
+      <div class="eq-row">
+        <span class="eq-lhs">num<sub>t</sub></span>
+        <span class="eq-eq">=</span>
+        <span class="eq-rhs">w · num<sub>t−1</sub> + e<sup>k<sub>t</sub></sup> · v<sub>t</sub></span>
+        <span class="eq-note">numerator state (weighted running total)</span>
+      </div>
+      <div class="eq-row">
+        <span class="eq-lhs">den<sub>t</sub></span>
+        <span class="eq-eq">=</span>
+        <span class="eq-rhs">w · den<sub>t−1</sub> + e<sup>k<sub>t</sub></sup></span>
+        <span class="eq-note">denominator state (weighted count)</span>
+      </div>
+      <div class="eq-row">
+        <span class="eq-lhs">wkv<sub>t</sub></span>
+        <span class="eq-eq">=</span>
+        <span class="eq-rhs">( e<sup>u+k<sub>t</sub></sup> · v<sub>t</sub> + num<sub>t−1</sub> ) ⁄ ( e<sup>u+k<sub>t</sub></sup> + den<sub>t−1</sub> )</span>
+        <span class="eq-note">WKV read-out — weighted average of all past values</span>
+      </div>
+      <div class="eq-row">
+        <span class="eq-lhs">y<sub>t</sub></span>
+        <span class="eq-eq">=</span>
+        <span class="eq-rhs">σ(r<sub>t</sub>) · wkv<sub>t</sub></span>
+        <span class="eq-note">receptance gate applied to the output</span>
+      </div>
+    </div>
+    <p class="eq-key"><span>w</span> — learned per-channel decay &nbsp;·&nbsp; <span>u</span> — learned per-channel bonus for the current token &nbsp;·&nbsp; <span>k<sub>t</sub>, v<sub>t</sub>, r<sub>t</sub></span> — key, value, receptance projections of token t &nbsp;·&nbsp; <span>σ</span> — sigmoid</p>
+  </section>
+
+  <section id="config">
+    <div class="eyebrow">03 — Training Configuration</div>
+    <h2>Hyperparameters (train.py)</h2>
+    <table>
+      <thead><tr><th>Parameter</th><th class="num">Value</th></tr></thead>
+      <tbody>
+        <tr><td>Hidden size</td><td class="num">640</td></tr>
+        <tr><td>Layers</td><td class="num">14</td></tr>
+        <tr><td>Head size</td><td class="num">64</td></tr>
+        <tr><td>Vocabulary</td><td class="num">8,192 (byte-level BPE)</td></tr>
+        <tr><td>Dropout</td><td class="num">0.1</td></tr>
+        <tr><td>Max sequence length</td><td class="num">256 tokens</td></tr>
+        <tr><td>Micro-batch size</td><td class="num">24</td></tr>
+        <tr><td>Gradient accumulation</td><td class="num">2 steps</td></tr>
+        <tr><td>Effective batch size</td><td class="num">48</td></tr>
+        <tr><td>Epochs</td><td class="num">3</td></tr>
+        <tr><td>Learning rate</td><td class="num">3e-4, cosine decay to 1e-5</td></tr>
+        <tr><td>Warmup steps</td><td class="num">100</td></tr>
+        <tr><td>Optimizer</td><td class="num">AdamW (decoupled weight decay, 0.1)</td></tr>
+        <tr><td>Gradient clipping</td><td class="num">1.0 (global norm)</td></tr>
+        <tr><td>Loss function</td><td class="num">Cross-entropy, ignore_index = pad (0)</td></tr>
+        <tr><td>Precision</td><td class="num">AMP fp16 on CUDA, fp32 on CPU</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section id="dataset">
+    <div class="eyebrow">04 — Dataset &amp; Tokenizer</div>
+    <h2>Corpus: Aether Dataset Generator v6</h2>
+    <p>Training source: <code>aether_dataset_mixed.jsonl</code>, ~500MB of synthetic, bilingual English/Greek text produced by a rule-based generator built on a curated knowledge base rather than fill-in-the-blank templates. 40 subjects (20 English, 20 Greek) each carry 10–15 hand-grounded facts and 2–4 real-world applications, which the generator recombines into flowing paragraphs, Q&amp;A pairs, and multi-turn conversations.</p>
+    <p>Each line is a JSON object with a single <code>text</code> field; sequences are clipped to 256 tokens with <code>&lt;bos&gt;</code>/<code>&lt;eos&gt;</code> markers and right-padded for batching.</p>
+
+    <div class="chart-row" style="margin-top:22px;">
+      <div class="chart-box">
+        <div class="bar-title">Generation Phases 1–6 (fixed)</div>
+        <svg viewBox="0 0 320 210" class="bar-svg">
+          <line x1="34" y1="8" x2="34" y2="176" stroke="#ddd5c2" stroke-width="1"/>
+          <line x1="34" y1="176" x2="310" y2="176" stroke="#1c1b19" stroke-width="1"/>
+          <!-- EN raw 4000 -->
+          <rect x="42" y="16" width="26" height="160" fill="#9a3324"/>
+          <text x="55" y="192" text-anchor="middle" class="bar-lbl" font-size="9">EN raw</text>
+          <text x="55" y="10" text-anchor="middle" class="bar-val" font-size="9">4,000</text>
+          <!-- GR raw 4000 -->
+          <rect x="76" y="16" width="26" height="160" fill="#9a3324"/>
+          <text x="89" y="192" text-anchor="middle" class="bar-lbl" font-size="9">GR raw</text>
+          <text x="89" y="10" text-anchor="middle" class="bar-val" font-size="9">4,000</text>
+          <!-- EN QA 2000 -->
+          <rect x="118" y="96" width="26" height="80" fill="#c97a4a"/>
+          <text x="131" y="90" text-anchor="middle" class="bar-val" font-size="9">2,000</text>
+          <text x="131" y="192" text-anchor="middle" class="bar-lbl" font-size="9">EN Q&amp;A</text>
+          <!-- GR QA 2000 -->
+          <rect x="152" y="96" width="26" height="80" fill="#c97a4a"/>
+          <text x="165" y="90" text-anchor="middle" class="bar-val" font-size="9">2,000</text>
+          <text x="165" y="192" text-anchor="middle" class="bar-lbl" font-size="9">GR Q&amp;A</text>
+          <!-- EN multi 1000 -->
+          <rect x="194" y="136" width="26" height="40" fill="#3f3a32"/>
+          <text x="207" y="130" text-anchor="middle" class="bar-val" font-size="9">1,000</text>
+          <text x="207" y="192" text-anchor="middle" class="bar-lbl" font-size="8.5">EN multi</text>
+          <!-- GR multi 1000 -->
+          <rect x="228" y="136" width="26" height="40" fill="#3f3a32"/>
+          <text x="241" y="130" text-anchor="middle" class="bar-val" font-size="9">1,000</text>
+          <text x="241" y="192" text-anchor="middle" class="bar-lbl" font-size="8.5">GR multi</text>
+        </svg>
+        <div class="chart-note">14,000 fixed entries before Phase 7 fills the remainder to 500MB by alternating EN/GR raw and Q&amp;A.</div>
+      </div>
+
+      <div class="chart-box">
+        <svg viewBox="0 0 280 240" class="pie-svg">
+          <circle cx="140" cy="120" r="90" fill="none" stroke="#e6dcc6" stroke-width="34"/>
+          <!-- Raw paragraphs 60% -->
+          <circle cx="140" cy="120" r="90" fill="none" stroke="#9a3324" stroke-width="34"
+            stroke-dasharray="339.3 565.5" stroke-dashoffset="0" transform="rotate(-90 140 120)"/>
+          <!-- Q&A 30% -->
+          <circle cx="140" cy="120" r="90" fill="none" stroke="#c97a4a" stroke-width="34"
+            stroke-dasharray="169.6 565.5" stroke-dashoffset="-339.3" transform="rotate(-90 140 120)"/>
+          <!-- Multi-turn 10% -->
+          <circle cx="140" cy="120" r="90" fill="none" stroke="#3f3a32" stroke-width="34"
+            stroke-dasharray="56.5 565.5" stroke-dashoffset="-508.9" transform="rotate(-90 140 120)"/>
+          <text x="140" y="114" text-anchor="middle" class="pie-num">~55K</text>
+          <text x="140" y="134" text-anchor="middle" class="pie-lbl">entries</text>
+        </svg>
+        <div class="legend">
+          <div class="legend-row"><span class="swatch" style="background:#9a3324"></span>Raw paragraphs <span class="legend-pct">60%</span></div>
+          <div class="legend-row"><span class="swatch" style="background:#c97a4a"></span>Q&amp;A pairs <span class="legend-pct">30%</span></div>
+          <div class="legend-row"><span class="swatch" style="background:#3f3a32"></span>Multi-turn <span class="legend-pct">10%</span></div>
+        </div>
+      </div>
+    </div>
+
+    <table style="margin-top:26px;">
+      <thead><tr><th>Property</th><th class="num">Value</th></tr></thead>
+      <tbody>
+        <tr><td>Subjects</td><td class="num">40 (20 English + 20 Greek)</td></tr>
+        <tr><td>Facts per subject</td><td class="num">10–15</td></tr>
+        <tr><td>Total unique facts</td><td class="num">~500–600</td></tr>
+        <tr><td>Applications per subject</td><td class="num">2–4</td></tr>
+        <tr><td>Total entries (est.)</td><td class="num">~50,000–60,000</td></tr>
+        <tr><td>Total tokens (est.)</td><td class="num">~100–125 million</td></tr>
+        <tr><td>Language split</td><td class="num">~50% English / ~50% Greek</td></tr>
+        <tr><td>Exact-duplicate rate</td><td class="num">&lt; 2%</td></tr>
+        <tr><td>Facts sampled per paragraph</td><td class="num">3–7, shuffled</td></tr>
+        <tr><td>Connector / closer variety</td><td class="num">~30 connectors, ~20 closers</td></tr>
+      </tbody>
+    </table>
+
+    <p style="margin-top:20px;">Diversity comes from combinatorics rather than volume of source text: each paragraph draws a random 3–7 facts from its subject's pool, shuffles their order, and joins them with one of ~30 connectors ("Moreover", "In addition", "What's more"), closing 35–55% of the time with one of ~20 natural closers. A capitalization-aware joiner keeps acronyms (DNA, CRISPR, GPS) and proper nouns (Einstein, Athens, Renaissance) correctly cased regardless of where they land in the sentence.</p>
+
+    <h2 style="margin-top:34px;">Tokenizer</h2>
+    <p>A byte-level BPE tokenizer (<code>tokenizer.py</code>) built directly on UTF-8 bytes as the base vocabulary, with learned merges on top. Because the base alphabet is raw bytes rather than a fixed character set, the tokenizer covers any Unicode language — including the mixed English/Greek corpus — without an out-of-vocabulary fallback.</p>
+    <table>
+      <thead><tr><th>Property</th><th class="num">Value</th></tr></thead>
+      <tbody>
+        <tr><td>Base alphabet</td><td class="num">256 raw bytes</td></tr>
+        <tr><td>Learned BPE merges</td><td class="num">7,936</td></tr>
+        <tr><td>Total vocabulary</td><td class="num">8,192</td></tr>
+        <tr><td>Special tokens</td><td class="num">&lt;pad&gt;=0, &lt;bos&gt;=1, &lt;eos&gt;=2, &lt;trn&gt;=3</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section id="how-it-works">
+    <div class="eyebrow">05 — How RWKV Works</div>
+    <h2>An RNN that trains like a Transformer</h2>
+    <p>RWKV — <em>Receptance, Weight, Key, Value</em> — was designed to keep the parallel trainability of Transformer attention while replacing its quadratic O(T²) cost with a linear O(T) recurrence. Instead of every token attending to every previous token through a softmax score matrix, RWKV carries a small, fixed-size running state forward through the sequence — much like an RNN's hidden state, but built from the same R/K/V vocabulary as attention.</p>
+    <p>The practical consequence: generating token 10,000 costs exactly as much as generating token 10 — no growing cache, no growing compute. This is what lets a 51M-parameter model run inference on a CPU at constant speed.</p>
+
+    <div class="compare-grid">
+      <div class="compare-col">
+        <div class="compare-head">Transformer Attention</div>
+        <div class="compare-body">Each token computes a score against <em>every</em> previous token, then softmax-weights all their values together.</div>
+        <div class="compare-cost">O(T²) compute · O(T) memory cache</div>
+      </div>
+      <div class="compare-col accent">
+        <div class="compare-head">RWKV (this model)</div>
+        <div class="compare-body">Each token updates one running numerator/denominator state, carried from the previous step — no score matrix is ever formed.</div>
+        <div class="compare-cost">O(T) compute · O(1) memory state</div>
+      </div>
+    </div>
+
+    <h2 style="margin-top:38px;">The four letters</h2>
+    <div class="rwkv-grid">
+      <div class="rwkv-card">
+        <div class="rwkv-letter">R</div>
+        <div class="rwkv-name">Receptance</div>
+        <div class="rwkv-desc">A learned sigmoid gate that decides how much of the newly mixed information is allowed to pass through to the output — the model's "how much do I accept this" valve.</div>
+      </div>
+      <div class="rwkv-card">
+        <div class="rwkv-letter">W</div>
+        <div class="rwkv-name">Weight (decay)</div>
+        <div class="rwkv-desc">A per-channel, learned decay rate. Each of the 640 hidden channels forgets its running state at its own trained pace — some channels hold information longer than others.</div>
+      </div>
+      <div class="rwkv-card">
+        <div class="rwkv-letter">K</div>
+        <div class="rwkv-name">Key</div>
+        <div class="rwkv-desc">Plays the same role as the key vector in standard attention — it determines how strongly the current token's content should weigh into the running state.</div>
+      </div>
+      <div class="rwkv-card">
+        <div class="rwkv-letter">V</div>
+        <div class="rwkv-name">Value</div>
+        <div class="rwkv-desc">The content actually being carried forward and blended — the payload that the key vector weights and the receptance gate ultimately releases.</div>
+      </div>
+    </div>
+
+    <h2 style="margin-top:38px;">Step by step, inside one block</h2>
+    <div class="flow">
+      <div class="flow-step">
+        <div class="flow-num">1</div>
+        <div class="flow-text"><strong>Token-shift.</strong> Each channel blends the current token's hidden value with the previous token's — a cheap, built-in sense of "what just happened" before any learned weights are applied.</div>
+      </div>
+      <div class="flow-step">
+        <div class="flow-num">2</div>
+        <div class="flow-text"><strong>Project to R, K, V.</strong> Three independent linear layers turn the shifted hidden state into a receptance, key, and value vector — exactly as a Transformer would, just without forming a score matrix.</div>
+      </div>
+      <div class="flow-step">
+        <div class="flow-num">3</div>
+        <div class="flow-text"><strong>Update the WKV state.</strong> The key/value pair is folded into two running totals — a numerator and a denominator — weighted by the learned per-channel decay <code>w</code>. This is the entire "memory" of every token seen so far, compressed into one fixed-size vector per channel.</div>
+      </div>
+      <div class="flow-step">
+        <div class="flow-num">4</div>
+        <div class="flow-text"><strong>Read the state, gate it.</strong> The numerator divided by the denominator gives a weighted average of all past values — this is the WKV output. The receptance gate (sigmoid of R) then decides how much of it actually passes through.</div>
+      </div>
+      <div class="flow-step">
+        <div class="flow-num">5</div>
+        <div class="flow-text"><strong>Channel-Mix.</strong> A second sub-layer — a small gated feed-forward network with a squared-ReLU nonlinearity — mixes information across the 640 channels themselves, refining the representation before it moves to the next block.</div>
+      </div>
+    </div>
+
+    <h2 style="margin-top:38px;">Why it stays cheap forever</h2>
+    <p>Because steps 3–4 only ever touch the <em>current</em> token plus a constant-size running state, RWKV can be unrolled two ways: in parallel across a whole training sequence (fast on GPU, just like a Transformer), or one token at a time during inference, carrying forward only <code>(numerator, denominator)</code> per channel per layer — never re-reading the past. Across 14 layers and 640 channels, that state is small enough to update on a CPU in real time, which is what makes a model with no GPU dependency and no attention cache possible at this size.</p>
+  </section>
+
+  <style>
+    .compare-grid{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--rule);border:1px solid var(--rule);margin-top:18px;}
+    .compare-col{background:var(--paper);padding:20px 20px;}
+    .compare-col.accent{background:var(--mono-bg);}
+    .compare-head{font-family:'Courier New',ui-monospace,Menlo,monospace;font-size:12px;letter-spacing:0.06em;text-transform:uppercase;font-weight:700;margin-bottom:10px;}
+    .compare-col.accent .compare-head{color:var(--accent);}
+    .compare-body{font-size:14.5px;color:var(--ink-soft);margin-bottom:12px;}
+    .compare-cost{font-family:'Courier New',ui-monospace,Menlo,monospace;font-size:12px;border-top:1px solid var(--rule);padding-top:10px;}
+
+    .rwkv-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:1px;background:var(--rule);border:1px solid var(--rule);margin-top:18px;}
+    .rwkv-card{background:var(--paper);padding:20px 18px;}
+    .rwkv-letter{font-family:'Source Serif 4',Georgia,serif;font-weight:700;font-size:34px;color:var(--accent);line-height:1;}
+    .rwkv-name{font-family:'Courier New',ui-monospace,Menlo,monospace;font-size:11px;letter-spacing:0.08em;text-transform:uppercase;color:var(--ink-soft);margin:8px 0 10px;}
+    .rwkv-desc{font-size:13.5px;line-height:1.5;}
+
+    .flow{margin-top:18px;border-left:2px solid var(--rule);padding-left:0;}
+    .flow-step{display:flex;gap:18px;padding:14px 0 14px 22px;border-bottom:1px solid var(--rule);position:relative;}
+    .flow-step:last-child{border-bottom:none;}
+    .flow-step::before{content:"";position:absolute;left:-7px;top:20px;width:11px;height:11px;border-radius:50%;background:var(--paper);border:2px solid var(--accent);}
+    .flow-num{font-family:'Courier New',ui-monospace,Menlo,monospace;font-size:12px;color:var(--ink-soft);flex-shrink:0;width:18px;padding-top:2px;}
+    .flow-text{font-size:14.5px;max-width:620px;}
+    .flow-text strong{font-weight:700;}
+
+    @media (max-width:560px){
+      .compare-grid{grid-template-columns:1fr;}
+    }
+  </style>
+
+  <section id="charts">
+    <div class="eyebrow">06 — Parameters &amp; Cost, Visualized</div>
+    <h2>Where the 51.1M parameters live</h2>
+    <p>Breaking the model down by sub-layer shows where capacity is spent. Channel-Mix carries the most weight per block (it projects up to a 1,280-wide hidden layer and back), Time-Mix is leaner, and the tied embedding/output table accounts for roughly a tenth of the model.</p>
+
+    <div class="chart-row">
+      <div class="chart-box">
+        <svg viewBox="0 0 280 280" class="pie-svg">
+          <circle cx="140" cy="140" r="95" fill="none" stroke="#e6dcc6" stroke-width="36"/>
+          <!-- Channel-Mix 56.2% -->
+          <circle cx="140" cy="140" r="95" fill="none" stroke="#9a3324" stroke-width="36"
+            stroke-dasharray="335.3 596.9" stroke-dashoffset="0" transform="rotate(-90 140 140)"/>
+          <!-- Time-Mix 33.7% -->
+          <circle cx="140" cy="140" r="95" fill="none" stroke="#c97a4a" stroke-width="36"
+            stroke-dasharray="201.0 596.9" stroke-dashoffset="-335.3" transform="rotate(-90 140 140)"/>
+          <!-- Embedding/Head (tied) 10.1% -->
+          <circle cx="140" cy="140" r="95" fill="none" stroke="#3f3a32" stroke-width="36"
+            stroke-dasharray="60.6 596.9" stroke-dashoffset="-536.3" transform="rotate(-90 140 140)"/>
+          <text x="140" y="133" text-anchor="middle" class="pie-num">51.1M</text>
+          <text x="140" y="153" text-anchor="middle" class="pie-lbl">parameters</text>
+        </svg>
+        <div class="legend">
+          <div class="legend-row"><span class="swatch" style="background:#9a3324"></span>Channel-Mix (×14) <span class="legend-pct">56.2%</span></div>
+          <div class="legend-row"><span class="swatch" style="background:#c97a4a"></span>Time-Mix (×14) <span class="legend-pct">33.7%</span></div>
+          <div class="legend-row"><span class="swatch" style="background:#3f3a32"></span>Embedding / Head, tied <span class="legend-pct">10.1%</span></div>
+        </div>
+      </div>
+
+      <div class="chart-box">
+        <div class="bar-title">Per-block parameter count</div>
+        <svg viewBox="0 0 320 220" class="bar-svg">
+          <line x1="70" y1="10" x2="70" y2="180" stroke="#ddd5c2" stroke-width="1"/>
+          <line x1="70" y1="180" x2="310" y2="180" stroke="#1c1b19" stroke-width="1"/>
+          <!-- Channel-Mix 2.05M -->
+          <rect x="90" y="29" width="48" height="151" fill="#9a3324"/>
+          <text x="114" y="22" text-anchor="middle" class="bar-val">2.05M</text>
+          <text x="114" y="198" text-anchor="middle" class="bar-lbl">Channel-Mix</text>
+          <!-- Time-Mix 1.23M -->
+          <rect x="168" y="89" width="48" height="91" fill="#c97a4a"/>
+          <text x="192" y="82" text-anchor="middle" class="bar-val">1.23M</text>
+          <text x="192" y="198" text-anchor="middle" class="bar-lbl">Time-Mix</text>
+          <!-- LayerNorm 0.003M -->
+          <rect x="246" y="178" width="48" height="2" fill="#3f3a32"/>
+          <text x="270" y="172" text-anchor="middle" class="bar-val">~0M</text>
+          <text x="270" y="198" text-anchor="middle" class="bar-lbl">LayerNorm</text>
+        </svg>
+        <div class="chart-note">Per single block, of 14 total — Channel-Mix's 640→1280→640 projection costs more than Time-Mix's three 640×640 matrices.</div>
+      </div>
+    </div>
+
+    <h2 style="margin-top:38px;">Inference cost: RWKV vs. self-attention</h2>
+    <p>The structural payoff of the recurrence shows up directly in how compute scales with context length. A standard Transformer's attention cost grows with the square of sequence length; RWKV's stays flat per token.</p>
+    <div class="chart-row">
+      <div class="chart-box wide">
+        <svg viewBox="0 0 600 220" class="bar-svg">
+          <line x1="60" y1="10" x2="60" y2="180" stroke="#ddd5c2" stroke-width="1"/>
+          <line x1="60" y1="180" x2="580" y2="180" stroke="#1c1b19" stroke-width="1"/>
+          <text x="30" y="14" class="axis-lbl">relative cost</text>
+
+          <!-- group: 256 tokens -->
+          <rect x="90" y="170" width="34" height="10" fill="#c97a4a"/>
+          <rect x="128" y="172" width="34" height="8" fill="#9a3324"/>
+          <text x="128" y="198" text-anchor="middle" class="bar-lbl">256</text>
+
+          <!-- group: 1024 tokens -->
+          <rect x="220" y="150" width="34" height="30" fill="#c97a4a"/>
+          <rect x="258" y="168" width="34" height="12" fill="#9a3324"/>
+          <text x="258" y="198" text-anchor="middle" class="bar-lbl">1,024</text>
+
+          <!-- group: 4096 tokens -->
+          <rect x="350" y="70" width="34" height="110" fill="#c97a4a"/>
+          <rect x="388" y="162" width="34" height="18" fill="#9a3324"/>
+          <text x="388" y="198" text-anchor="middle" class="bar-lbl">4,096</text>
+
+          <!-- group: 16384 tokens -->
+          <rect x="480" y="12" width="34" height="168" fill="#c97a4a"/>
+          <rect x="518" y="148" width="34" height="32" fill="#9a3324"/>
+          <text x="518" y="198" text-anchor="middle" class="bar-lbl">16,384</text>
+
+          <text x="330" y="208" text-anchor="middle" class="axis-lbl">sequence length (tokens)</text>
+        </svg>
+        <div class="legend horiz">
+          <div class="legend-row"><span class="swatch" style="background:#c97a4a"></span>Self-attention · O(T²)</div>
+          <div class="legend-row"><span class="swatch" style="background:#9a3324"></span>RWKV WKV state · O(T)</div>
+        </div>
+        <div class="chart-note">Bar heights are illustrative of relative growth rate, not measured wall-clock — the point is the curve shape: quadratic vs. linear.</div>
+      </div>
+    </div>
+  </section>
+
+  <style>
+    .chart-row{display:flex;gap:1px;background:var(--rule);border:1px solid var(--rule);margin-top:18px;flex-wrap:wrap;}
+    .chart-box{background:var(--paper);padding:22px 24px;flex:1 1 260px;}
+    .chart-box.wide{flex:1 1 100%;}
+    .pie-svg{width:100%;max-width:240px;display:block;margin:0 auto;}
+    .pie-num{font-family:'Source Serif 4',Georgia,serif;font-weight:700;font-size:26px;fill:var(--ink);}
+    .pie-lbl{font-family:'Courier New',ui-monospace,Menlo,monospace;font-size:10px;letter-spacing:0.06em;text-transform:uppercase;fill:var(--ink-soft);}
+    .legend{margin-top:18px;}
+    .legend.horiz{display:flex;gap:24px;flex-wrap:wrap;margin-top:14px;}
+    .legend-row{display:flex;align-items:center;gap:8px;font-size:13px;margin-bottom:6px;color:var(--ink-soft);}
+    .legend-row .swatch{width:11px;height:11px;flex-shrink:0;display:inline-block;}
+    .legend-pct{margin-left:auto;font-family:'Courier New',ui-monospace,Menlo,monospace;font-size:12px;color:var(--ink);padding-left:10px;}
+    .bar-title{font-family:'Courier New',ui-monospace,Menlo,monospace;font-size:11px;letter-spacing:0.06em;text-transform:uppercase;color:var(--ink-soft);margin-bottom:12px;}
+    .bar-svg{width:100%;height:auto;display:block;}
+    .bar-val{font-family:'Courier New',ui-monospace,Menlo,monospace;font-size:11px;fill:var(--ink);}
+    .bar-lbl{font-family:'Courier New',ui-monospace,Menlo,monospace;font-size:10.5px;fill:var(--ink-soft);}
+    .axis-lbl{font-family:'Courier New',ui-monospace,Menlo,monospace;font-size:10px;fill:var(--ink-soft);}
+    .chart-note{margin-top:14px;font-size:12.5px;color:var(--ink-soft);font-style:italic;}
+    @media (max-width:560px){
+      .chart-row{flex-direction:column;}
+    }
+  </style>
+
+  <section id="ledger">
+    <div class="eyebrow">07 — Exact Parameter Ledger</div>
+    <h2>Every weight, accounted for</h2>
+    <p>The full parameter count follows directly from the config above: vocabulary 8,192, hidden 640, 14 layers, FFN hidden 1,280 (2×640). Weight tying between the embedding table and the output head — the two largest single tensors in the model — saves another 5.24M parameters rather than storing them twice.</p>
+
+    <table>
+      <thead><tr><th>Component</th><th>Shape</th><th class="num">Parameters</th></tr></thead>
+      <tbody>
+        <tr><td>Token embedding</td><td class="file">8,192 × 640</td><td class="num">5,242,880</td></tr>
+        <tr><td colspan="3" style="padding-top:16px;padding-bottom:4px;"><em>Per block — Time-Mix</em></td></tr>
+        <tr><td>time_decay (w)</td><td class="file">640</td><td class="num">640</td></tr>
+        <tr><td>time_first (u)</td><td class="file">640</td><td class="num">640</td></tr>
+        <tr><td>receptance, key, value weights</td><td class="file">3 × 640 × 640</td><td class="num">1,228,800</td></tr>
+        <tr><td>LayerNorm (pre Time-Mix)</td><td class="file">2 × 640</td><td class="num">1,280</td></tr>
+        <tr><td><strong>Time-Mix subtotal</strong></td><td></td><td class="num"><strong>1,231,360</strong></td></tr>
+        <tr><td colspan="3" style="padding-top:16px;padding-bottom:4px;"><em>Per block — Channel-Mix</em></td></tr>
+        <tr><td>key projection (up)</td><td class="file">640 × 1,280</td><td class="num">819,200</td></tr>
+        <tr><td>value projection (down)</td><td class="file">1,280 × 640</td><td class="num">819,200</td></tr>
+        <tr><td>receptance weight</td><td class="file">640 × 640</td><td class="num">409,600</td></tr>
+        <tr><td>LayerNorm (pre Channel-Mix)</td><td class="file">2 × 640</td><td class="num">1,280</td></tr>
+        <tr><td><strong>Channel-Mix subtotal</strong></td><td></td><td class="num"><strong>2,049,280</strong></td></tr>
+        <tr><td><strong>Per block, total</strong></td><td></td><td class="num"><strong>3,280,640</strong></td></tr>
+        <tr><td><strong>× 14 blocks</strong></td><td></td><td class="num"><strong>45,928,960</strong></td></tr>
+        <tr><td colspan="3" style="padding-top:16px;padding-bottom:4px;"><em>Output</em></td></tr>
+        <tr><td>Final LayerNorm</td><td class="file">2 × 640</td><td class="num">1,280</td></tr>
+        <tr><td>Output head (tied to embedding)</td><td class="file">shared</td><td class="num">+0</td></tr>
+        <tr><td style="border-top:2px solid var(--ink);"><strong>TOTAL</strong></td><td style="border-top:2px solid var(--ink);"></td><td class="num" style="border-top:2px solid var(--ink);"><strong>51,173,120</strong></td></tr>
+      </tbody>
+    </table>
+
+    <div class="stat-grid" style="margin-top:22px;">
+      <div class="stat"><div class="num">195.2 MB</div><div class="lbl">Weights, FP32</div></div>
+      <div class="stat"><div class="num">97.6 MB</div><div class="lbl">Weights, FP16</div></div>
+      <div class="stat"><div class="num">5.24M saved</div><div class="lbl">Via Weight Tying</div></div>
+      <div class="stat"><div class="num">1/√640</div><div class="lbl">Embedding Init Scale</div></div>
+    </div>
+  </section>
+
+  <section id="complexity">
+    <div class="eyebrow">08 — State, FLOPs &amp; Scaling Behavior</div>
+    <h2>What the model actually carries between tokens</h2>
+    <p>At inference, Aether never re-reads past tokens. Each of the 14 layers keeps exactly two vectors — a numerator and a denominator, each 640-wide — and that's the entire memory of everything generated so far.</p>
+
+    <table>
+      <thead><tr><th>Quantity</th><th class="num">Size</th></tr></thead>
+      <tbody>
+        <tr><td>State per layer <span style="color:var(--ink-soft);">(num + den)</span></td><td class="num">2 × 640 = 1,280 floats</td></tr>
+        <tr><td>State, full model <span style="color:var(--ink-soft);">(× 14 layers)</span></td><td class="num">17,920 floats</td></tr>
+        <tr><td>State memory, FP32</td><td class="num">≈ 70 KB</td></tr>
+        <tr><td>State memory, FP16</td><td class="num">≈ 35 KB</td></tr>
+      </tbody>
+    </table>
+    <p class="chart-note" style="margin-top:10px;">That ~70KB is constant — it does not grow whether the model has generated 10 tokens or 100,000. A Transformer's KV cache, by contrast, grows linearly with every generated token.</p>
+
+    <h2 style="margin-top:36px;">Compute per token vs. per sequence</h2>
+    <p>Inference cost per token is dominated by the block's matrix multiplications — not by the WKV recurrence itself, which is comparatively cheap:</p>
+    <table>
+      <thead><tr><th>Stage</th><th class="num">Cost</th></tr></thead>
+      <tbody>
+        <tr><td>Time-Mix projections (R, K, V)</td><td class="num">O(d²) ≈ 3 × 640² = 1.23M ops</td></tr>
+        <tr><td>WKV state update &amp; read</td><td class="num">O(d) ≈ 640 ops</td></tr>
+        <tr><td>Channel-Mix projections</td><td class="num">O(d²) ≈ 640×1,280×2 = 1.64M ops</td></tr>
+        <tr><td>Per block, per token</td><td class="num">≈ 2.9M ops</td></tr>
+        <tr><td>All 14 blocks, per token</td><td class="num">≈ 41M ops</td></tr>
+        <tr><td>Output head (640 → 8,192)</td><td class="num">≈ 5.2M ops</td></tr>
+        <tr><td><strong>Total, per generated token</strong></td><td class="num"><strong>≈ 46M ops</strong></td></tr>
+        <tr><td>Full forward pass, T=256 (training)</td><td class="num">≈ 13.8 billion FLOPs</td></tr>
+      </tbody>
+    </table>
+    <p>Because inference cost per step never depends on how many tokens came before, generating the 50,000th token costs the same ~46M operations as generating the 5th — the defining property that separates RWKV from quadratic-attention Transformers at long context lengths.</p>
+
+    <h2 style="margin-top:36px;">RWKV v4 vs. v7 — what changes</h2>
+    <p>Aether's blocks follow the v4 formulation. RWKV v7 keeps the same numerator/denominator recurrence but replaces v4's single scalar decay and static projections with token-dependent, low-rank ("LoRA-style") modulation of the decay, gating, and value paths — trading roughly 10–15% more parameters for materially better long-context recall.</p>
+    <table>
+      <thead><tr><th></th><th>RWKV v4 (this model)</th><th>RWKV v7</th></tr></thead>
+      <tbody>
+        <tr><td>Time-decay</td><td>Single learned vector <code>w ∈ ℝ^d</code>, static per channel</td><td>Token-dependent decay via low-rank projection (<code>w0, w1, w2</code>)</td></tr>
+        <tr><td>Token mixing</td><td>None — direct projection of <code>x_t</code></td><td>Data-dependent blend <code>x_t + μ⊙(x_{t-1}-x_t)</code>, learned per channel</td></tr>
+        <tr><td>Value path</td><td>Static value projection</td><td>Value residual mixing across layers (<code>v0, v1, v2</code>)</td></tr>
+        <tr><td>Gating</td><td>Single sigmoid receptance gate</td><td>Additional learned gate (<code>g1, g2</code>) on top of receptance</td></tr>
+        <tr><td>Extra params / layer</td><td>— (baseline)</td><td>~10–15% more, via rank-64 to rank-128 LoRA factors</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <footer>
+    AETHER · RWKV v4 · 51,173,120 PARAMETERS · 14×640 · BUILD SPEC GENERATED FROM TRAIN.PY CONFIGURATION
+  </footer>
+
+</div>
+
+</body>
+</html>

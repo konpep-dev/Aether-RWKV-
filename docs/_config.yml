@@ -1,0 +1,4 @@
+# GitHub Pages Configuration
+theme: jekyll-theme-minimal
+title: Aether
+description: A 51.1M-parameter RWKV language model
