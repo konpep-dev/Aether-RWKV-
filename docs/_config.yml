@@ -7,7 +7,7 @@ repository: konpep-dev/Aether-RWKV-
 baseurl: "/Aether-RWKV-"
 url: "https://konpep-dev.github.io"
 
-# Exclude files from Jekyll processing
+# Use index.html as the main page
+# Exclude README files from Jekyll processing
 exclude:
   - README.md
-  - _config.yml
