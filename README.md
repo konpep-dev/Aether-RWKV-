@@ -2,7 +2,7 @@
 
 **A 51.1M-parameter RWKV language model trained on bilingual English/Greek text**
 
-[![Model Card](https://img.shields.io/badge/Model_Card-View-blue)](https://konpep.github.io/aether)
+[![Model Card](https://img.shields.io/badge/Model_Card-View-blue)](https://konpep-dev.github.io/Aether-RWKV-)
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 [![Python](https://img.shields.io/badge/Python-3.8+-blue.svg)](https://www.python.org/)
 [![PyTorch](https://img.shields.io/badge/PyTorch-2.0+-red.svg)](https://pytorch.org/)
@@ -51,8 +51,8 @@ Input → Embedding → [Block × 14] → LayerNorm → Linear Head → Output
 ### Installation
 
 ```bash
-git clone https://github.com/konpep/aether.git
-cd aether
+git clone https://github.com/konpep-dev/Aether-RWKV-.git
+cd Aether-RWKV-
 pip install -r requirements.txt
 ```
 
@@ -136,7 +136,9 @@ aether/
 
 Full technical documentation, architecture diagrams, and training details:
 
-👉 **[View Interactive Model Card](https://konpep.github.io/aether)**
+👉 **[View Interactive Model Card](https://konpep-dev.github.io/Aether-RWKV-/)**
+
+> **Note**: The interactive model card includes complete architecture breakdowns, training hyperparameters, dataset statistics, RWKV mechanism explanations, and performance visualizations.
 
 ![How RWKV Works](docs/images/06_how_it_works.png)
 
@@ -180,7 +182,7 @@ MIT License — see [LICENSE](LICENSE) for details.
   author = {Konpep},
   title = {Aether: A 51M-parameter RWKV language model},
   year = {2026},
-  url = {https://github.com/konpep/aether}
+  url = {https://github.com/konpep-dev/Aether-RWKV-}
 }
 ```
 
