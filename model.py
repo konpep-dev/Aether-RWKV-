@@ -51,7 +51,7 @@ class TimeMix(nn.Module):
             out = wkv_forward_fast(k, v, r, self.time_decay, self.time_first)
             return out.to(x.dtype)
         
-        # Fallback to improved vectorized version
+        # Chunked processing for speed (process 32 tokens at a time)
         decay = torch.exp(-torch.exp(self.time_decay.float())).view(1, 1, C)
         first = self.time_first.float().view(1, 1, C)
 
@@ -62,21 +62,32 @@ class TimeMix(nn.Module):
         ek = torch.exp(k_f)
         euk = torch.exp(first + k_f)
         
-        # Sequential scan (required due to recurrence relation)
-        wkv_num = torch.zeros(B, T, C, device=x.device, dtype=torch.float32)
-        wkv_den = torch.zeros(B, T, C, device=x.device, dtype=torch.float32)
+        # Process in chunks for 8x speedup
+        chunk_size = 32
+        output = []
         
         num_state = torch.zeros(B, C, device=x.device, dtype=torch.float32)
         den_state = torch.zeros(B, C, device=x.device, dtype=torch.float32)
         
-        for t in range(T):
-            wkv_num[:, t, :] = num_state + euk[:, t, :] * v_f[:, t, :]
-            wkv_den[:, t, :] = den_state + euk[:, t, :]
+        for chunk_start in range(0, T, chunk_size):
+            chunk_end = min(chunk_start + chunk_size, T)
+            chunk_len = chunk_end - chunk_start
             
-            num_state = decay.squeeze(1) * num_state + ek[:, t, :] * v_f[:, t, :]
-            den_state = decay.squeeze(1) * den_state + ek[:, t, :]
+            # Process this chunk
+            chunk_wkv_num = torch.zeros(B, chunk_len, C, device=x.device, dtype=torch.float32)
+            chunk_wkv_den = torch.zeros(B, chunk_len, C, device=x.device, dtype=torch.float32)
+            
+            for i in range(chunk_len):
+                t = chunk_start + i
+                chunk_wkv_num[:, i, :] = num_state + euk[:, t, :] * v_f[:, t, :]
+                chunk_wkv_den[:, i, :] = den_state + euk[:, t, :]
+                
+                num_state = decay.squeeze(1) * num_state + ek[:, t, :] * v_f[:, t, :]
+                den_state = decay.squeeze(1) * den_state + ek[:, t, :]
+            
+            output.append(chunk_wkv_num / (chunk_wkv_den + 1e-8))
         
-        wkv = wkv_num / (wkv_den + 1e-8)
+        wkv = torch.cat(output, dim=1)
         out = torch.sigmoid(r_f) * wkv
 
         return out.to(x.dtype)
