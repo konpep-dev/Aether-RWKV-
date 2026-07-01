@@ -3,6 +3,8 @@ AETHER DATASET GENERATOR v6 — High Quality Bilingual (EN+GR)
   Strategy: Coherent, factually grounded, subject-specific entries.
   Each entry uses subject-aware facts, NOT random template combinations.
   Target: 500MB, ~50% EN / 50% GR, minimal repetition.
+  
+  Identity Strategy: Aether identity is present but not overwhelming (~2% frequency)
 """
 
 import json
@@ -13,6 +15,22 @@ random.seed(42)
 
 def pick(p):
     return random.choice(p)
+
+def pick_subject(subjects, identity_weight=0.02):
+    """
+    Pick a subject with weighted probability.
+    First subject (Aether) appears with reduced frequency.
+    
+    Args:
+        subjects: List of subject dictionaries
+        identity_weight: Probability of selecting Aether (default 2%)
+    """
+    if random.random() < identity_weight:
+        # Select Aether (first subject)
+        return subjects[0]
+    else:
+        # Select from other subjects uniformly
+        return random.choice(subjects[1:])
 
 def _smart_connector(connector: str, fact: str) -> str:
     """Connect a transition to a fact, preserving acronyms and proper nouns."""
@@ -76,6 +94,26 @@ def _natural_join(facts: list, connectors: list, closers: list, name: str,
 # ===================================================================
 
 SUBJECTS_EN = [
+    {
+        "name": "Aether AI model",
+        "facts": [
+            "Aether is a 51-million-parameter bilingual language model that speaks both English and Greek fluently.",
+            "The model was created by Konpep, a developer passionate about making AI accessible to Greek speakers.",
+            "Aether is based on the RWKV version 4 architecture, which offers linear complexity instead of quadratic attention.",
+            "The architecture consists of 14 layers with a hidden size of 640 dimensions.",
+            "RWKV models train like Transformers but run with O(T) linear complexity during inference.",
+            "Aether was trained on 500MB of bilingual text, covering diverse topics in both English and Greek.",
+            "The training data includes raw text, question-answer pairs, and multi-turn conversations.",
+            "Aether uses a byte-level BPE tokenizer with an 8,192-token vocabulary, handling any Unicode language.",
+            "The model can run on CPU without requiring a GPU, making it accessible for inference on standard computers.",
+            "Aether represents an effort to bring high-quality AI language models to the Greek-speaking community.",
+        ],
+        "applications": [
+            "Aether can be used for bilingual text generation, translation assistance, and conversational AI",
+            "the model serves as a foundation for fine-tuning on specialized Greek or English tasks",
+            "Aether demonstrates that efficient architectures like RWKV can deliver strong performance with fewer parameters",
+        ]
+    },
     {
         "name": "black holes",
         "facts": [
@@ -479,6 +517,26 @@ SUBJECTS_EN = [
 ]
 
 SUBJECTS_GR = [
+    {
+        "name": "το μοντέλο Aether",
+        "facts": [
+            "Το Aether είναι ένα δίγλωσσο γλωσσικό μοντέλο 51 εκατομμυρίων παραμέτρων που μιλάει Ελληνικά και Αγγλικά άπταιστα.",
+            "Το μοντέλο δημιουργήθηκε από τον Konpep, έναν προγραμματιστή με πάθος για την προσβασιμότητα της ΤΝ στους Έλληνες.",
+            "Το Aether βασίζεται στην αρχιτεκτονική RWKV έκδοση 4, που προσφέρει γραμμική πολυπλοκότητα αντί τετραγωνικής προσοχής.",
+            "Η αρχιτεκτονική αποτελείται από 14 επίπεδα με κρυφό μέγεθος 640 διαστάσεων.",
+            "Τα μοντέλα RWKV εκπαιδεύονται σαν Transformers αλλά τρέχουν με γραμμική πολυπλοκότητα O(T) κατά την εκτέλεση.",
+            "Το Aether εκπαιδεύτηκε σε 500MB δίγλωσσου κειμένου, καλύπτοντας ποικίλα θέματα στα Ελληνικά και Αγγλικά.",
+            "Τα δεδομένα εκπαίδευσης περιλαμβάνουν ανοιχτό κείμενο, ζεύγη ερώτησης-απάντησης και συνομιλίες πολλαπλών γύρων.",
+            "Το Aether χρησιμοποιεί έναν tokenizer BPE επιπέδου byte με λεξιλόγιο 8.192 tokens, διαχειριζόμενο οποιαδήποτε γλώσσα Unicode.",
+            "Το μοντέλο μπορεί να τρέξει σε CPU χωρίς να απαιτεί GPU, καθιστώντας το προσβάσιμο για εκτέλεση σε κανονικούς υπολογιστές.",
+            "Το Aether αντιπροσωπεύει μια προσπάθεια να φέρει υψηλής ποιότητας γλωσσικά μοντέλα ΤΝ στην ελληνόφωνη κοινότητα.",
+        ],
+        "applications": [
+            "το Aether μπορεί να χρησιμοποιηθεί για δίγλωσση παραγωγή κειμένου, βοήθεια μετάφρασης και συνομιλιακή ΤΝ",
+            "το μοντέλο λειτουργεί ως βάση για fine-tuning σε εξειδικευμένες ελληνικές ή αγγλικές εργασίες",
+            "το Aether αποδεικνύει ότι αποδοτικές αρχιτεκτονικές όπως το RWKV μπορούν να προσφέρουν ισχυρή απόδοση με λιγότερες παραμέτρους",
+        ]
+    },
     {
         "name": "η κβαντομηχανική",
         "facts": [
@@ -960,39 +1018,57 @@ def generate():
             total += 1
 
         # ── Phase 1: EN raw paragraphs (many passes, varied facts) ──
-        print("Phase 1: EN raw paragraphs...")
-        for _ in range(200):
-            for subj in SUBJECTS_EN:
+        # Raw text for general language understanding (NO user/assistant format)
+        # MAXIMUM RAW DATA for strong pre-training base
+        print("Phase 1: EN raw paragraphs (pre-training style)...")
+        for pass_num in range(15000):  # 15000 × 19 = ~285K entries! (skip Aether 95%)
+            for idx, subj in enumerate(SUBJECTS_EN):
+                # Skip Aether 95% of the time to reduce frequency
+                if idx == 0 and random.random() > 0.05:
+                    continue
                 write(raw_entry(build_en_paragraph(subj)))
 
         # ── Phase 2: GR raw paragraphs ──
-        print("Phase 2: GR raw paragraphs...")
-        for _ in range(200):
-            for subj in SUBJECTS_GR:
+        print("Phase 2: GR raw paragraphs (pre-training style)...")
+        for pass_num in range(15000):  # 15000 × 19 = ~285K entries!
+            for idx, subj in enumerate(SUBJECTS_GR):
+                # Skip Aether 95% of the time to reduce frequency
+                if idx == 0 and random.random() > 0.05:
+                    continue
                 write(raw_entry(build_gr_paragraph(subj)))
 
         # ── Phase 3: EN single-turn Q&A ──
-        print("Phase 3: EN Q&A...")
-        for _ in range(100):
-            for subj in SUBJECTS_EN:
+        # Structured Q&A in User:/Aether: format
+        print("Phase 3: EN Q&A (User/Aether format)...")
+        for pass_num in range(100):
+            for idx, subj in enumerate(SUBJECTS_EN):
+                # Skip Aether 95% of the time to reduce frequency
+                if idx == 0 and random.random() > 0.05:
+                    continue
                 q = pick(Q_EN).format(subj["name"])
                 a = build_en_answer(subj)
                 emo = pick(EMOTION_TAGS)
                 write(qa_entry(q, a, emo))
 
         # ── Phase 4: GR single-turn Q&A ──
-        print("Phase 4: GR Q&A...")
-        for _ in range(100):
-            for subj in SUBJECTS_GR:
+        print("Phase 4: GR Q&A (User/Aether format)...")
+        for pass_num in range(100):
+            for idx, subj in enumerate(SUBJECTS_GR):
+                # Skip Aether 95% of the time to reduce frequency
+                if idx == 0 and random.random() > 0.05:
+                    continue
                 q = pick(Q_GR).format(subj["name"])
                 a = build_gr_answer(subj)
                 emo = pick(EMOTION_TAGS)
                 write(qa_entry(q, a, emo))
 
         # ── Phase 5: EN multi-turn conversations ──
-        print("Phase 5: EN multi-turn...")
-        for _ in range(50):
-            for subj in SUBJECTS_EN:
+        print("Phase 5: EN multi-turn (User/Aether format)...")
+        for pass_num in range(200):  # Increased from 50 to 200
+            for idx, subj in enumerate(SUBJECTS_EN):
+                # Skip Aether 95% of the time to reduce frequency
+                if idx == 0 and random.random() > 0.05:
+                    continue
                 q = pick(Q_EN).format(subj["name"])
                 a = build_en_answer(subj)
                 fq = pick(FOLLOW_Q_EN)
@@ -1006,9 +1082,12 @@ def generate():
                 write(multi_entry(turns))
 
         # ── Phase 6: GR multi-turn conversations ──
-        print("Phase 6: GR multi-turn...")
-        for _ in range(50):
-            for subj in SUBJECTS_GR:
+        print("Phase 6: GR multi-turn (User/Aether format)...")
+        for pass_num in range(200):  # Increased from 50 to 200
+            for idx, subj in enumerate(SUBJECTS_GR):
+                # Skip Aether 95% of the time to reduce frequency
+                if idx == 0 and random.random() > 0.05:
+                    continue
                 q = pick(Q_GR).format(subj["name"])
                 a = build_gr_answer(subj)
                 fq = pick(FOLLOW_Q_GR)
@@ -1022,27 +1101,25 @@ def generate():
                 write(multi_entry(turns))
 
         # ── Phase 7: Fill remaining space ──
-        print("Phase 7: Filling to 500MB...")
+        # ONLY Q&A format from here on (no more raw text)
+        print("Phase 7: Filling to 500MB (Q&A format only)...")
         iteration = 0
         while True:
             current_size = os.path.getsize(output_path)
             if current_size >= target_bytes:
                 break
 
-            # Alternate EN/GR, alternate raw/qa
-            if iteration % 4 == 0:
-                subj = pick(SUBJECTS_EN)
-                write(raw_entry(build_en_paragraph(subj)))
-            elif iteration % 4 == 1:
-                subj = pick(SUBJECTS_GR)
-                write(raw_entry(build_gr_paragraph(subj)))
-            elif iteration % 4 == 2:
-                subj = pick(SUBJECTS_EN)
+            # Alternate EN/GR Q&A (NO raw entries!)
+            # Use weighted selection: Aether appears ~2% of the time
+            if iteration % 2 == 0:
+                # English Q&A
+                subj = pick_subject(SUBJECTS_EN, identity_weight=0.02)
                 q = pick(Q_EN).format(subj["name"])
                 a = build_en_answer(subj)
                 write(qa_entry(q, a, pick(EMOTION_TAGS)))
             else:
-                subj = pick(SUBJECTS_GR)
+                # Greek Q&A
+                subj = pick_subject(SUBJECTS_GR, identity_weight=0.02)
                 q = pick(Q_GR).format(subj["name"])
                 a = build_gr_answer(subj)
                 write(qa_entry(q, a, pick(EMOTION_TAGS)))
