@@ -7,10 +7,10 @@ import math, os
 try:
     from wkv_cuda_kernel import wkv_forward_fast, warmup_wkv_kernel
     USE_FAST_WKV = True
-    print("✅ Optimized WKV kernel available (TorchScript/Triton)")
+    print("[OK] Optimized WKV kernel available (TorchScript/Triton)")
 except ImportError:
     USE_FAST_WKV = False
-    print("⚠️ Using fallback WKV (slower)")
+    print("[WARNING] Using fallback WKV (slower)")
 
 class TimeMix(nn.Module):
     def __init__(self, hidden_size):
@@ -55,7 +55,7 @@ class TimeMix(nn.Module):
                 return out.to(x.dtype)
             except Exception as e:
                 # Fallback to Python if kernel fails
-                print(f"⚠️ CUDA kernel failed ({e}), using fallback")
+                print(f"[WARNING] CUDA kernel failed ({e}), using fallback")
         
         # Fallback: Simple sequential WKV - O(T) complexity
         w = -torch.exp(self.time_decay.float())  # [C] - log decay
@@ -222,6 +222,72 @@ class RWKV(nn.Module):
         for block in self.blocks:
             state.append(block.time_mix.init_state(device, dtype))
         return state
+
+    def generate(self, input_ids, max_new=50, temperature=0.8, top_k=40, repetition_penalty=1.0, stop_tokens=None):
+        """
+        Generate text autoregressively using the model.
+        
+        Args:
+            input_ids: List of token IDs (prompt)
+            max_new: Maximum number of new tokens to generate
+            temperature: Sampling temperature (higher = more random)
+            top_k: Top-k sampling (0 = disabled)
+            repetition_penalty: Penalty for repeating tokens
+            stop_tokens: List of token IDs that stop generation
+        
+        Returns:
+            List of all token IDs (prompt + generated)
+        """
+        device = next(self.parameters()).device
+        dtype = next(self.parameters()).dtype
+        
+        # Initialize state
+        state = self.init_state(batch_size=1, device=device, dtype=dtype)
+        
+        # Track generated tokens
+        all_ids = list(input_ids)
+        stop_tokens = stop_tokens or []
+        
+        # Process prompt through model to build state
+        for i, token_id in enumerate(input_ids):
+            inp = torch.tensor([[token_id]], device=device, dtype=torch.long)
+            logits, state = self.forward_step(inp, state)
+        
+        # Generate new tokens
+        for _ in range(max_new):
+            # Get logits for next token
+            logits = logits[0]  # [vocab_size]
+            
+            # Apply repetition penalty
+            if repetition_penalty != 1.0:
+                for prev_id in set(all_ids):
+                    if prev_id < len(logits):
+                        logits[prev_id] /= repetition_penalty
+            
+            # Apply temperature
+            logits = logits / max(temperature, 1e-6)
+            
+            # Top-k sampling
+            if top_k > 0:
+                top_k_actual = min(top_k, logits.size(-1))
+                indices_to_remove = logits < torch.topk(logits, top_k_actual)[0][..., -1, None]
+                logits[indices_to_remove] = float('-inf')
+            
+            # Sample next token
+            probs = torch.softmax(logits, dim=-1)
+            next_id = torch.multinomial(probs, num_samples=1).item()
+            
+            # Check stop condition
+            if next_id in stop_tokens:
+                break
+            
+            all_ids.append(next_id)
+            
+            # Forward step for next iteration
+            inp = torch.tensor([[next_id]], device=device, dtype=torch.long)
+            logits, state = self.forward_step(inp, state)
+        
+        return all_ids
 
     def compile_model(self, mode="default", fullgraph=False):
         if os.name == 'nt':
