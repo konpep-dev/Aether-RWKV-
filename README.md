@@ -37,7 +37,7 @@ Input → Embedding → [Block × 14] → LayerNorm → Linear Head → Output
          ↓
     Block = LayerNorm → Time-Mix → Residual → LayerNorm → Channel-Mix → Residual
 ```
-
+[![Architecture diagram](https://gitdiagram.com/diagram-badge.svg)](https://gitdiagram.com/konpep-dev/aether-rwkv-?utm_source=readme&utm_medium=badge)
 **Complexity:**
 - Training: O(T) per token (parallelizable like Transformers)
 - Inference: O(1) per token (constant memory, no cache growth)
